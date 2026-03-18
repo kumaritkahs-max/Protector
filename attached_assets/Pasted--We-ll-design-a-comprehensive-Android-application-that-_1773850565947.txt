@@ -1,0 +1,481 @@
+‎We'll design a comprehensive Android application that performs deep, continuous scanning of the device's storage to catalog all photos, videos, and files, stores their metadata permanently, and offers automated syncing to external services like email and Telegram. The app will run persistently in the background, detect new files in near real‑time, and provide a rich interface for browsing and sorting media with full metadata. Below is a deep technical breakdown of the entire APK, its architecture, features, and implementation considerations.
+‎
+‎---
+‎
+‎1. Overview & Core Features
+‎
+‎Goal: Create an Android app that:
+‎
+‎· Scans every folder (including hidden, system, app‑specific, and external SD cards) to find all photos, videos, and files.
+‎· Stores metadata (path, filename, size, date modified, folder name, MIME type, dimensions for images/videos, duration for videos, etc.) permanently within the app’s private database.
+‎· Continuously monitors for new or changed files (scan interval ~10–15 seconds) and updates its catalog.
+‎· Provides three main tabs:
+‎  · Photos – all image files.
+‎  · Videos – all video files.
+‎  · Files – all other file types (or optionally all files).
+‎· Supports sorting by folder name, newest, oldest, size, type, etc.
+‎· Allows automatic syncing of newly discovered files to user‑configured destinations (Email, Telegram bot, etc.) at fixed intervals.
+‎· Runs entirely in the background, even when the app is closed.
+‎· Stores user credentials for sync targets securely inside the app.
+‎
+‎Additional "best" features we can incorporate:
+‎
+‎· Search by filename, folder, or metadata.
+‎· Filter by file type (images only, videos only, documents, etc.).
+‎· Thumbnail generation for quick previews.
+‎· Duplicate file detection.
+‎· Option to export catalog as CSV/JSON.
+‎· Local backup of metadata.
+‎· Support for multiple sync profiles (e.g., different Telegram chats for photos vs. videos).
+‎· Manual sync trigger.
+‎· Dark/light theme.
+‎
+‎---
+‎
+‎2. Technical Architecture
+‎
+‎The app will follow MVVM with Clean Architecture principles, using modern Android components:
+‎
+‎· Kotlin as the primary language.
+‎· Jetpack Compose for UI (or XML if preferred – but Compose is modern and faster to iterate).
+‎· Room database for persistent metadata storage.
+‎· DataStore (or EncryptedSharedPreferences) for user settings and credentials.
+‎· WorkManager for background scanning and syncing tasks.
+‎· FileObserver / ContentObserver for real‑time file change detection.
+‎· Coroutines and Flow for asynchronous operations.
+‎· Hilt for dependency injection.
+‎· Coil or Glide for image loading (thumbnails).
+‎· Retrofit / OkHttp for Telegram bot API communication.
+‎· JavaMail API (or a lighter alternative) for email sending.
+‎
+‎2.1 Modules / Layers
+‎
+‎· Data Layer: Repositories that abstract data sources (database, file system, network).
+‎· Domain Layer: Use cases for scanning, syncing, etc.
+‎· Presentation Layer: ViewModels + Composables/Activities.
+‎
+‎---
+‎
+‎3. Deep Scanning Mechanism
+‎
+‎3.1 Challenges on Modern Android (Scoped Storage)
+‎
+‎· Android 10+ restricts direct file access via File API. We need to use MediaStore for media files and Storage Access Framework (SAF) or MANAGE_EXTERNAL_STORAGE permission for non‑media files.
+‎· To scan all folders, the app will request MANAGE_EXTERNAL_STORAGE (All files access) which is allowed for apps with a legitimate need (like file managers). We must declare the permission and pass Google Play review if distributed on Play Store.
+‎· For devices without that permission, fallback to MediaStore and SAF.
+‎
+‎3.2 Initial Deep Scan
+‎
+‎· On first launch, perform a full scan:
+‎  · Use ContentResolver to query MediaStore.Images, MediaStore.Video, and MediaStore.Files (for all file types) – this covers most user‑visible files.
+‎  · To reach hidden folders and app‑private directories, use File walking on paths obtained from Environment.getExternalStorageDirectory() (deprecated but still usable with MANAGE_EXTERNAL_STORAGE), /storage/emulated/0/, and external SD card paths (via Context.getExternalFilesDirs() and traversing up).
+‎  · For each file, collect metadata:
+‎    · Path, name, size, lastModified, MIME type.
+‎    · For images: width, height, orientation (via ExifInterface).
+‎    · For videos: duration, resolution (via MediaMetadataRetriever).
+‎    · Folder name = parent directory name.
+‎  · Insert into Room database (with conflict strategy to update if file already exists based on path and lastModified).
+‎· This initial scan can be heavy; run on a background thread with progress indication.
+‎
+‎3.3 Continuous / Incremental Scanning
+‎
+‎· Real‑time monitoring: Use FileObserver on key directories (like DCIM, Pictures, Downloads, and any folder the user adds). However, FileObserver is not recursive and has limits on the number of observers. An alternative is to use ContentObserver on MediaStore – it notifies of changes to media files.
+‎· Periodic deep scan: Schedule a WorkManager periodic task every 10–15 minutes (not seconds – 10‑15 seconds is too aggressive and will drain battery). For near‑real‑time, combine with FileObserver/ContentObserver. We'll compromise: a quick scan every 15 minutes, plus instant detection for MediaStore changes.
+‎· When a change is detected (new/modified/deleted file), update the database accordingly. For deletions, remove from DB.
+‎
+‎3.4 Handling Hidden and System Folders
+‎
+‎· With MANAGE_EXTERNAL_STORAGE, we can traverse directories like ./nomedia, .thumbnails, etc. We'll include them by default but may give user an option to exclude certain folders.
+‎
+‎---
+‎
+‎4. Data Storage (Permanent Saving)
+‎
+‎The phrase "automatically save in their app for permanently" likely means the app maintains its own catalog, not necessarily copying files (which would double storage). We'll store metadata and a reference to the original file. If the user wants to keep files even if originals are deleted, we could implement an "archive" feature that copies selected files to app‑private storage. But for the main feature, we just catalog.
+‎
+‎Database schema (simplified):
+‎
+‎```kotlin
+‎@Entity(tableName = "files")
+‎data class FileEntry(
+‎    @PrimaryKey val path: String,          // unique file path
+‎    val name: String,
+‎    val folderPath: String,                 // parent folder path
+‎    val folderName: String,
+‎    val size: Long,
+‎    val lastModified: Long,
+‎    val mimeType: String,
+‎    val fileType: FileType,                 // PHOTO, VIDEO, OTHER
+‎    val width: Int?,
+‎    val height: Int?,
+‎    val duration: Long?,
+‎    val dateAdded: Long,                     // when we first saw it
+‎    val isHidden: Boolean,
+‎    val thumbnailPath: String?               // path to generated thumbnail (stored in app cache)
+‎)
+‎```
+‎
+‎We'll use Room with indexes on folderPath, lastModified, fileType for fast sorting/filtering.
+‎
+‎---
+‎
+‎5. Background Processing
+‎
+‎5.1 Scanning Worker
+‎
+‎· Extends CoroutineWorker.
+‎· Performs incremental scan: query MediaStore for changes since last scan (using date_modified), and walk known folders for new files (using File.listFiles()). For performance, we can store last scan time and only check files modified after that.
+‎· Update database accordingly.
+‎· Schedule using PeriodicWorkRequest with minimum interval 15 minutes (flexible). Use setExpedited for important updates.
+‎
+‎5.2 Real‑time Monitoring
+‎
+‎· Register ContentObserver on MediaStore.Images.Media.EXTERNAL_CONTENT_URI and Video.Media.EXTERNAL_CONTENT_URI to listen for changes. When triggered, query the specific changed item and update DB.
+‎· For non‑media files, use FileObserver on key directories. Since we can't watch everything, rely on periodic deep scan.
+‎
+‎5.3 Sync Worker
+‎
+‎· Periodic worker (user‑configurable interval, e.g., every hour) that queries the database for files that are "new" (since last sync) and uploads them to configured destinations.
+‎· For each sync target, implement a separate module:
+‎  · Email: Use JavaMail to send files as attachments. Limitations: attachment size, need user's SMTP credentials.
+‎  · Telegram: Use Bot API sendDocument or sendPhoto. Need bot token and chat ID.
+‎  · Could extend to other services (Nextcloud, Dropbox, etc.).
+‎· After successful sync, mark files as synced to avoid re‑uploading. Keep sync history.
+‎
+‎5.4 Persistence & Constraints
+‎
+‎· Workers use setConstraints to require network for sync, maybe charging for large scans.
+‎· Use setBackoffCriteria for retries.
+‎· Store last sync timestamps and credentials in EncryptedSharedPreferences.
+‎
+‎---
+‎
+‎6. UI/UX Details
+‎
+‎6.1 Main Tabs
+‎
+‎· Photos: Grid/list of image thumbnails, with folder grouping option.
+‎· Videos: Similar, with video duration overlay.
+‎· Files: List view with icons, sizes, dates.
+‎· Each tab has a sort button: by folder name, newest, oldest, size, type (asc/desc).
+‎· Filter option: show only from selected folders, or by date range.
+‎
+‎6.2 Folder View
+‎
+‎· Option to browse by folder hierarchy, showing counts of files per folder.
+‎
+‎6.3 Settings / Sync Configuration
+‎
+‎· Sync Targets: Add/Edit/Delete.
+‎  · For Email: SMTP server, port, username, password, recipient, subject template.
+‎  · For Telegram: Bot token, chat ID, caption template.
+‎· Sync Schedule: Interval (every 1, 6, 12, 24 hours) or manual only.
+‎· Sync Scope: Which file types to sync (all, only photos, only videos, etc.).
+‎· Credentials: Stored encrypted.
+‎
+‎6.4 Permissions
+‎
+‎· Request MANAGE_EXTERNAL_STORAGE (if targeting < Android 11, can use legacy storage; but for future‑proof, we'll handle both).
+‎· For Android 10+ without All Files Access, we'll fallback to MediaStore + SAF for user‑selected folders.
+‎
+‎---
+‎
+‎7. Implementation Steps (High‑Level)
+‎
+‎1. Project Setup: Kotlin, Compose, Room, Hilt, WorkManager.
+‎2. Permissions: Declare in manifest, handle runtime requests.
+‎3. Database: Design and create Room entities, DAOs.
+‎4. Scanning Module:
+‎   · Write repository to query MediaStore and file system.
+‎   · Implement initial scan as a one‑time worker.
+‎   · Implement incremental scan worker.
+‎   · Set up ContentObserver for real‑time media changes.
+‎5. UI:
+‎   · Main activity with Compose navigation (bottom bar for tabs).
+‎   · ViewModels for each tab that observe database (Flow) and apply sorting.
+‎   · Thumbnail generation (background) and caching.
+‎6. Sync Module:
+‎   · Create abstraction for SyncTarget.
+‎   · Implement EmailSync and TelegramSync.
+‎   · UI for configuring targets.
+‎   · Sync worker that collects unsynced files and uploads.
+‎7. Background Work:
+‎   · Schedule periodic scan and sync workers.
+‎   · Use WorkManager and handle doze mode.
+‎8. Testing & Optimization:
+‎   · Test on various Android versions and devices.
+‎   · Optimize database queries, reduce battery drain.
+‎
+‎---
+‎
+‎8. Challenges & Mitigations
+‎
+‎Challenge Mitigation
+‎Battery drain from frequent scanning Use WorkManager with flex intervals; rely on ContentObserver for real‑time media; batch updates.
+‎Storage access on Android 10+ Use MANAGE_EXTERNAL_STORAGE with justification; fallback to SAF for users who deny.
+‎Large number of files Paginate UI queries; use lazy lists; store only metadata, not file copies.
+‎File deletions / moves Detect via ContentObserver; periodic scan will catch inconsistencies; handle orphaned records.
+‎Sync reliability Store sync status; retry with exponential backoff; handle network failures.
+‎Security of credentials Use EncryptedSharedPreferences and Android Keystore.
+‎Thumbnail storage Generate thumbnails on‑demand and cache in app's cache directory; clear cache periodically.
+‎
+‎---
+‎
+‎9. Additional "Best" Features We Can Add
+‎
+‎· Duplicate Finder: Group files by hash (MD5) to show duplicates.
+‎· Cloud Backup: Sync metadata to a user‑owned cloud (via WebDAV, etc.).
+‎· File Recovery: If a file is deleted from device but still in our catalog, offer to restore from backup (if synced).
+‎· Advanced Filters: By date taken (EXIF), camera model, resolution.
+‎· Root Support: If device is rooted, access all system directories.
+‎· Export/Import Catalog: JSON backup of metadata.
+‎· Material You theming.
+‎
+‎---
+‎
+‎10. Summary
+‎
+‎This Android app will be a powerful file cataloging and syncing tool, similar to disk diggers but with automated background scanning and flexible sync options. By leveraging modern Android components, we can build a robust, battery‑efficient application that respects user privacy while offering deep file discovery. The key is balancing thoroughness with performance, and providing an intuitive UI to manage the vast amount of data.
+‎
+‎We'll proceed with the architecture outlined, implementing incrementally and testing on real devices to ensure compatibility. The final APK will be a feature‑rich file manager / syncer that runs silently in the background, giving users peace of mind that their files are always cataloged and optionally backed up.
+‎We'll design a comprehensive Android application that performs deep, continuous scanning of the device's storage to catalog all photos, videos, and files, stores their metadata permanently, and offers automated syncing to external services like email and Telegram. The app will run persistently in the background, detect new files in near real‑time, and provide a rich interface for browsing and sorting media with full metadata. Below is a deep technical breakdown of the entire APK, its architecture, features, and implementation considerations.
+‎
+‎---
+‎
+‎1. Overview & Core Features
+‎
+‎Goal: Create an Android app that:
+‎
+‎· Scans every folder (including hidden, system, app‑specific, and external SD cards) to find all photos, videos, and files.
+‎· Stores metadata (path, filename, size, date modified, folder name, MIME type, dimensions for images/videos, duration for videos, etc.) permanently within the app’s private database.
+‎· Continuously monitors for new or changed files (scan interval ~10–15 seconds) and updates its catalog.
+‎· Provides three main tabs:
+‎  · Photos – all image files.
+‎  · Videos – all video files.
+‎  · Files – all other file types (or optionally all files).
+‎· Supports sorting by folder name, newest, oldest, size, type, etc.
+‎· Allows automatic syncing of newly discovered files to user‑configured destinations (Email, Telegram bot, etc.) at fixed intervals.
+‎· Runs entirely in the background, even when the app is closed.
+‎· Stores user credentials for sync targets securely inside the app.
+‎
+‎Additional "best" features we can incorporate:
+‎
+‎· Search by filename, folder, or metadata.
+‎· Filter by file type (images only, videos only, documents, etc.).
+‎· Thumbnail generation for quick previews.
+‎· Duplicate file detection.
+‎· Option to export catalog as CSV/JSON.
+‎· Local backup of metadata.
+‎· Support for multiple sync profiles (e.g., different Telegram chats for photos vs. videos).
+‎· Manual sync trigger.
+‎· Dark/light theme.
+‎
+‎---
+‎
+‎2. Technical Architecture
+‎
+‎The app will follow MVVM with Clean Architecture principles, using modern Android components:
+‎
+‎· Kotlin as the primary language.
+‎· Jetpack Compose for UI (or XML if preferred – but Compose is modern and faster to iterate).
+‎· Room database for persistent metadata storage.
+‎· DataStore (or EncryptedSharedPreferences) for user settings and credentials.
+‎· WorkManager for background scanning and syncing tasks.
+‎· FileObserver / ContentObserver for real‑time file change detection.
+‎· Coroutines and Flow for asynchronous operations.
+‎· Hilt for dependency injection.
+‎· Coil or Glide for image loading (thumbnails).
+‎· Retrofit / OkHttp for Telegram bot API communication.
+‎· JavaMail API (or a lighter alternative) for email sending.
+‎
+‎2.1 Modules / Layers
+‎
+‎· Data Layer: Repositories that abstract data sources (database, file system, network).
+‎· Domain Layer: Use cases for scanning, syncing, etc.
+‎· Presentation Layer: ViewModels + Composables/Activities.
+‎
+‎---
+‎
+‎3. Deep Scanning Mechanism
+‎
+‎3.1 Challenges on Modern Android (Scoped Storage)
+‎
+‎· Android 10+ restricts direct file access via File API. We need to use MediaStore for media files and Storage Access Framework (SAF) or MANAGE_EXTERNAL_STORAGE permission for non‑media files.
+‎· To scan all folders, the app will request MANAGE_EXTERNAL_STORAGE (All files access) which is allowed for apps with a legitimate need (like file managers). We must declare the permission and pass Google Play review if distributed on Play Store.
+‎· For devices without that permission, fallback to MediaStore and SAF.
+‎
+‎3.2 Initial Deep Scan
+‎
+‎· On first launch, perform a full scan:
+‎  · Use ContentResolver to query MediaStore.Images, MediaStore.Video, and MediaStore.Files (for all file types) – this covers most user‑visible files.
+‎  · To reach hidden folders and app‑private directories, use File walking on paths obtained from Environment.getExternalStorageDirectory() (deprecated but still usable with MANAGE_EXTERNAL_STORAGE), /storage/emulated/0/, and external SD card paths (via Context.getExternalFilesDirs() and traversing up).
+‎  · For each file, collect metadata:
+‎    · Path, name, size, lastModified, MIME type.
+‎    · For images: width, height, orientation (via ExifInterface).
+‎    · For videos: duration, resolution (via MediaMetadataRetriever).
+‎    · Folder name = parent directory name.
+‎  · Insert into Room database (with conflict strategy to update if file already exists based on path and lastModified).
+‎· This initial scan can be heavy; run on a background thread with progress indication.
+‎
+‎3.3 Continuous / Incremental Scanning
+‎
+‎· Real‑time monitoring: Use FileObserver on key directories (like DCIM, Pictures, Downloads, and any folder the user adds). However, FileObserver is not recursive and has limits on the number of observers. An alternative is to use ContentObserver on MediaStore – it notifies of changes to media files.
+‎· Periodic deep scan: Schedule a WorkManager periodic task every 10–15 minutes (not seconds – 10‑15 seconds is too aggressive and will drain battery). For near‑real‑time, combine with FileObserver/ContentObserver. We'll compromise: a quick scan every 15 minutes, plus instant detection for MediaStore changes.
+‎· When a change is detected (new/modified/deleted file), update the database accordingly. For deletions, remove from DB.
+‎
+‎3.4 Handling Hidden and System Folders
+‎
+‎· With MANAGE_EXTERNAL_STORAGE, we can traverse directories like ./nomedia, .thumbnails, etc. We'll include them by default but may give user an option to exclude certain folders.
+‎
+‎---
+‎
+‎4. Data Storage (Permanent Saving)
+‎
+‎The phrase "automatically save in their app for permanently" likely means the app maintains its own catalog, not necessarily copying files (which would double storage). We'll store metadata and a reference to the original file. If the user wants to keep files even if originals are deleted, we could implement an "archive" feature that copies selected files to app‑private storage. But for the main feature, we just catalog.
+‎
+‎Database schema (simplified):
+‎
+‎```kotlin
+‎@Entity(tableName = "files")
+‎data class FileEntry(
+‎    @PrimaryKey val path: String,          // unique file path
+‎    val name: String,
+‎    val folderPath: String,                 // parent folder path
+‎    val folderName: String,
+‎    val size: Long,
+‎    val lastModified: Long,
+‎    val mimeType: String,
+‎    val fileType: FileType,                 // PHOTO, VIDEO, OTHER
+‎    val width: Int?,
+‎    val height: Int?,
+‎    val duration: Long?,
+‎    val dateAdded: Long,                     // when we first saw it
+‎    val isHidden: Boolean,
+‎    val thumbnailPath: String?               // path to generated thumbnail (stored in app cache)
+‎)
+‎```
+‎
+‎We'll use Room with indexes on folderPath, lastModified, fileType for fast sorting/filtering.
+‎
+‎---
+‎
+‎5. Background Processing
+‎
+‎5.1 Scanning Worker
+‎
+‎· Extends CoroutineWorker.
+‎· Performs incremental scan: query MediaStore for changes since last scan (using date_modified), and walk known folders for new files (using File.listFiles()). For performance, we can store last scan time and only check files modified after that.
+‎· Update database accordingly.
+‎· Schedule using PeriodicWorkRequest with minimum interval 15 minutes (flexible). Use setExpedited for important updates.
+‎
+‎5.2 Real‑time Monitoring
+‎
+‎· Register ContentObserver on MediaStore.Images.Media.EXTERNAL_CONTENT_URI and Video.Media.EXTERNAL_CONTENT_URI to listen for changes. When triggered, query the specific changed item and update DB.
+‎· For non‑media files, use FileObserver on key directories. Since we can't watch everything, rely on periodic deep scan.
+‎
+‎5.3 Sync Worker
+‎
+‎· Periodic worker (user‑configurable interval, e.g., every hour) that queries the database for files that are "new" (since last sync) and uploads them to configured destinations.
+‎· For each sync target, implement a separate module:
+‎  · Email: Use JavaMail to send files as attachments. Limitations: attachment size, need user's SMTP credentials.
+‎  · Telegram: Use Bot API sendDocument or sendPhoto. Need bot token and chat ID.
+‎  · Could extend to other services (Nextcloud, Dropbox, etc.).
+‎· After successful sync, mark files as synced to avoid re‑uploading. Keep sync history.
+‎
+‎5.4 Persistence & Constraints
+‎
+‎· Workers use setConstraints to require network for sync, maybe charging for large scans.
+‎· Use setBackoffCriteria for retries.
+‎· Store last sync timestamps and credentials in EncryptedSharedPreferences.
+‎
+‎---
+‎
+‎6. UI/UX Details
+‎
+‎6.1 Main Tabs
+‎
+‎· Photos: Grid/list of image thumbnails, with folder grouping option.
+‎· Videos: Similar, with video duration overlay.
+‎· Files: List view with icons, sizes, dates.
+‎· Each tab has a sort button: by folder name, newest, oldest, size, type (asc/desc).
+‎· Filter option: show only from selected folders, or by date range.
+‎
+‎6.2 Folder View
+‎
+‎· Option to browse by folder hierarchy, showing counts of files per folder.
+‎
+‎6.3 Settings / Sync Configuration
+‎
+‎· Sync Targets: Add/Edit/Delete.
+‎  · For Email: SMTP server, port, username, password, recipient, subject template.
+‎  · For Telegram: Bot token, chat ID, caption template.
+‎· Sync Schedule: Interval (every 1, 6, 12, 24 hours) or manual only.
+‎· Sync Scope: Which file types to sync (all, only photos, only videos, etc.).
+‎· Credentials: Stored encrypted.
+‎
+‎6.4 Permissions
+‎
+‎· Request MANAGE_EXTERNAL_STORAGE (if targeting < Android 11, can use legacy storage; but for future‑proof, we'll handle both).
+‎· For Android 10+ without All Files Access, we'll fallback to MediaStore + SAF for user‑selected folders.
+‎
+‎---
+‎
+‎7. Implementation Steps (High‑Level)
+‎
+‎1. Project Setup: Kotlin, Compose, Room, Hilt, WorkManager.
+‎2. Permissions: Declare in manifest, handle runtime requests.
+‎3. Database: Design and create Room entities, DAOs.
+‎4. Scanning Module:
+‎   · Write repository to query MediaStore and file system.
+‎   · Implement initial scan as a one‑time worker.
+‎   · Implement incremental scan worker.
+‎   · Set up ContentObserver for real‑time media changes.
+‎5. UI:
+‎   · Main activity with Compose navigation (bottom bar for tabs).
+‎   · ViewModels for each tab that observe database (Flow) and apply sorting.
+‎   · Thumbnail generation (background) and caching.
+‎6. Sync Module:
+‎   · Create abstraction for SyncTarget.
+‎   · Implement EmailSync and TelegramSync.
+‎   · UI for configuring targets.
+‎   · Sync worker that collects unsynced files and uploads.
+‎7. Background Work:
+‎   · Schedule periodic scan and sync workers.
+‎   · Use WorkManager and handle doze mode.
+‎8. Testing & Optimization:
+‎   · Test on various Android versions and devices.
+‎   · Optimize database queries, reduce battery drain.
+‎
+‎---
+‎
+‎8. Challenges & Mitigations
+‎
+‎Challenge Mitigation
+‎Battery drain from frequent scanning Use WorkManager with flex intervals; rely on ContentObserver for real‑time media; batch updates.
+‎Storage access on Android 10+ Use MANAGE_EXTERNAL_STORAGE with justification; fallback to SAF for users who deny.
+‎Large number of files Paginate UI queries; use lazy lists; store only metadata, not file copies.
+‎File deletions / moves Detect via ContentObserver; periodic scan will catch inconsistencies; handle orphaned records.
+‎Sync reliability Store sync status; retry with exponential backoff; handle network failures.
+‎Security of credentials Use EncryptedSharedPreferences and Android Keystore.
+‎Thumbnail storage Generate thumbnails on‑demand and cache in app's cache directory; clear cache periodically.
+‎
+‎---
+‎
+‎9. Additional "Best" Features We Can Add
+‎
+‎· Duplicate Finder: Group files by hash (MD5) to show duplicates.
+‎· Cloud Backup: Sync metadata to a user‑owned cloud (via WebDAV, etc.).
+‎· File Recovery: If a file is deleted from device but still in our catalog, offer to restore from backup (if synced).
+‎· Advanced Filters: By date taken (EXIF), camera model, resolution.
+‎· Root Support: If device is rooted, access all system directories.
+‎· Export/Import Catalog: JSON backup of metadata.
+‎· Material You theming.
+‎
+‎---
+‎
+‎10. Summary
+‎
+‎This Android app will be a powerful file cataloging and syncing tool, similar to disk diggers but with automated background scanning and flexible sync options. By leveraging modern Android components, we can build a robust, battery‑efficient application that respects user privacy while offering deep file discovery. The key is balancing thoroughness with performance, and providing an intuitive UI to manage the vast amount of data.
+‎
+‎We'll proceed with the architecture outlined, implementing incrementally and testing on real devices to ensure compatibility. The final APK will be a feature‑rich file manager / syncer that runs silently in the background, giving users peace of mind that their files are always cataloged and optionally backed up.
+‎
