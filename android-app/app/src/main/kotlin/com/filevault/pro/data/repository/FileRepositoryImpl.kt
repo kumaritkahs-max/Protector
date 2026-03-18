@@ -221,7 +221,7 @@ class FileRepositoryImpl @Inject constructor(
         val roots = FileUtils.getExternalStorageRoots()
 
         for (root in roots) {
-            root.walkTopDown()
+            val chunks = root.walkTopDown()
                 .onEnter { dir ->
                     excluded.none { ex -> dir.absolutePath.startsWith(ex) } &&
                             !dir.name.startsWith(".thumbnails") &&
@@ -229,33 +229,36 @@ class FileRepositoryImpl @Inject constructor(
                             dir.canRead()
                 }
                 .filter { it.isFile && it.length() > 0 }
-                .chunked(500) { chunk ->
-                    onProgress(chunk.first().parent ?: "", count)
-                    val entities = chunk.mapNotNull { file ->
-                        if (excluded.any { ex -> file.absolutePath.startsWith(ex) }) return@mapNotNull null
-                        val mime = FileUtils.getMimeType(file)
-                        val fileType = FileType.fromExtension(file.extension)
-                        FileEntryEntity(
-                            path = file.absolutePath,
-                            name = file.name,
-                            folderPath = file.parent ?: "",
-                            folderName = file.parentFile?.name ?: "",
-                            sizeBytes = file.length(),
-                            lastModified = file.lastModified(),
-                            mimeType = mime,
-                            fileType = fileType.name,
-                            width = null, height = null, durationMs = null, orientation = null,
-                            cameraMake = null, cameraModel = null, hasGps = false, dateTaken = null,
-                            dateAdded = System.currentTimeMillis(),
-                            isHidden = FileUtils.isHidden(file),
-                            contentHash = null, thumbnailCachePath = null,
-                            isSyncIgnored = false, lastSyncedAt = null,
-                            isDeletedFromDevice = false
-                        )
-                    }
-                    fileEntryDao.upsertAll(entities)
-                    count += entities.size
+                .toList()
+                .chunked(500)
+
+            for (chunk in chunks) {
+                onProgress(chunk.first().parent ?: "", count)
+                val entities = chunk.mapNotNull { file ->
+                    if (excluded.any { ex -> file.absolutePath.startsWith(ex) }) return@mapNotNull null
+                    val mime = FileUtils.getMimeType(file)
+                    val fileType = FileType.fromExtension(file.extension)
+                    FileEntryEntity(
+                        path = file.absolutePath,
+                        name = file.name,
+                        folderPath = file.parent ?: "",
+                        folderName = file.parentFile?.name ?: "",
+                        sizeBytes = file.length(),
+                        lastModified = file.lastModified(),
+                        mimeType = mime,
+                        fileType = fileType.name,
+                        width = null, height = null, durationMs = null, orientation = null,
+                        cameraMake = null, cameraModel = null, hasGps = false, dateTaken = null,
+                        dateAdded = System.currentTimeMillis(),
+                        isHidden = FileUtils.isHidden(file),
+                        contentHash = null, thumbnailCachePath = null,
+                        isSyncIgnored = false, lastSyncedAt = null,
+                        isDeletedFromDevice = false
+                    )
                 }
+                fileEntryDao.upsertAll(entities)
+                count += entities.size
+            }
         }
         count
     }
