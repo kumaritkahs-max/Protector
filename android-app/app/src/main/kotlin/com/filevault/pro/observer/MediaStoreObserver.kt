@@ -28,7 +28,7 @@ class MediaStoreObserver @Inject constructor(
 ) {
     companion object {
         private const val TAG = "MediaStoreObserver"
-        private const val DEBOUNCE_MS = 2000L
+        private const val DEBOUNCE_MS = 30_000L
 
         private val KEY_DIRECTORIES = listOf(
             "/storage/emulated/0/DCIM",

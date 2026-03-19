@@ -32,6 +32,7 @@ class ScanWorker @AssistedInject constructor(
     companion object {
         private const val TAG = "ScanWorker"
         const val KEY_IS_INITIAL = "is_initial_scan"
+        const val KEY_FULL_SCAN = "full_scan"
         const val KEY_PROGRESS_STAGE = "scan_progress_stage"
         const val KEY_PROGRESS_COUNT = "scan_progress_count"
         private const val NOTIFICATION_ID = 2001
@@ -93,7 +94,8 @@ class ScanWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val isInitial = inputData.getBoolean(KEY_IS_INITIAL, false)
-        Log.d(TAG, "ScanWorker starting (initial=$isInitial)")
+        val isFullScan = inputData.getBoolean(KEY_FULL_SCAN, false) || isInitial
+        Log.d(TAG, "ScanWorker starting (initial=$isInitial, fullScan=$isFullScan)")
         return try {
             setForeground(buildForegroundInfo("Starting scan…"))
             var totalCount = 0
@@ -102,16 +104,23 @@ class ScanWorker @AssistedInject constructor(
             val mediaCount = fileRepository.performMediaStoreScan()
             totalCount += mediaCount
             Log.d(TAG, "MediaStore scan: $mediaCount files")
-            updateProgress(mediaCount, "MediaStore complete, scanning filesystem…")
 
-            val fsCount = fileRepository.performFileSystemWalk { folder, count ->
-                if (count % 500 == 0) {
-                    Log.v(TAG, "Walking: $folder ($count files so far)")
-                    updateProgress(count, "Walking filesystem…")
+            val fsCount = if (isFullScan) {
+                updateProgress(mediaCount, "MediaStore complete, scanning filesystem…")
+                val n = fileRepository.performFileSystemWalk { folder, count ->
+                    if (count % 500 == 0) {
+                        Log.v(TAG, "Walking: $folder ($count files so far)")
+                        updateProgress(count, "Walking filesystem…")
+                    }
                 }
+                Log.d(TAG, "File system walk: $n files")
+                n
+            } else {
+                Log.d(TAG, "Skipping filesystem walk (quick scan mode)")
+                0
             }
+
             totalCount += fsCount
-            Log.d(TAG, "File system walk: $fsCount files")
             updateProgress(totalCount, "Finalizing…")
 
             appPreferences.setLastScanAt(System.currentTimeMillis())
@@ -128,7 +137,10 @@ class ScanWorker @AssistedInject constructor(
                 AppNotification(
                     type = NotificationType.SCAN,
                     title = "Scan Complete",
-                    message = "Cataloged $totalCount files · MediaStore: $mediaCount · Filesystem: $fsCount"
+                    message = if (isFullScan)
+                        "Cataloged $totalCount files · MediaStore: $mediaCount · Filesystem: $fsCount"
+                    else
+                        "Cataloged $mediaCount files from MediaStore"
                 )
             )
             Result.success()

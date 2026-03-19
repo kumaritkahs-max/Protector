@@ -14,6 +14,9 @@ interface FileEntryDao {
     @Upsert
     suspend fun upsertAll(entities: List<FileEntryEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIfNotExists(entities: List<FileEntryEntity>)
+
     @Query("SELECT * FROM file_entries WHERE is_deleted_from_device = 0 ORDER BY last_modified DESC")
     fun getAllFilesFlow(): Flow<List<FileEntryEntity>>
 

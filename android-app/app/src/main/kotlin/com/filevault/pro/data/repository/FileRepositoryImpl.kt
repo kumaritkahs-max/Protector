@@ -28,6 +28,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -43,6 +45,8 @@ class FileRepositoryImpl @Inject constructor(
     private companion object {
         const val TAG = "FileRepository"
     }
+
+    private val scanMutex = Mutex()
 
     override fun getAllPhotos(sortOrder: SortOrder, filter: FileFilter): Flow<List<FileEntry>> =
         fileEntryDao.getAllPhotosFlowAll().map { entities ->
@@ -127,6 +131,11 @@ class FileRepositoryImpl @Inject constructor(
     }
 
     override suspend fun performMediaStoreScan(): Int = withContext(Dispatchers.IO) {
+        if (scanMutex.isLocked) {
+            Log.d(TAG, "performMediaStoreScan: scan already in progress, skipping")
+            return@withContext 0
+        }
+        scanMutex.withLock {
         val seenPaths = HashSet<String>(1024)
         val excluded  = excludedFolderDao.getAllPaths().toSet()
         var total = 0
@@ -322,6 +331,7 @@ class FileRepositoryImpl @Inject constructor(
 
         Log.d(TAG, "performMediaStoreScan: complete — indexed $total files")
         total
+        } // end scanMutex.withLock
     }
 
     override suspend fun performFileSystemWalk(
@@ -381,7 +391,7 @@ class FileRepositoryImpl @Inject constructor(
                         )
                     )
                     if (buffer.size >= 500) {
-                        fileEntryDao.upsertAll(buffer.toList())
+                        fileEntryDao.insertAllIfNotExists(buffer.toList())
                         count += buffer.size
                         onProgress(file.parent ?: "", count)
                         buffer.clear()
@@ -389,7 +399,7 @@ class FileRepositoryImpl @Inject constructor(
                 }
 
             if (buffer.isNotEmpty()) {
-                fileEntryDao.upsertAll(buffer.toList())
+                fileEntryDao.insertAllIfNotExists(buffer.toList())
                 count += buffer.size
                 onProgress("", count)
                 buffer.clear()
