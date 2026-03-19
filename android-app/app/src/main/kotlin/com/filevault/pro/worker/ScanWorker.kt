@@ -1,11 +1,18 @@
 package com.filevault.pro.worker
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.filevault.pro.R
 import com.filevault.pro.data.preferences.AppPreferences
 import com.filevault.pro.domain.repository.FileRepository
 import com.filevault.pro.domain.model.AppNotification
@@ -28,23 +35,51 @@ class ScanWorker @AssistedInject constructor(
         const val KEY_IS_INITIAL = "is_initial_scan"
         const val KEY_PROGRESS_STAGE = "scan_progress_stage"
         const val KEY_PROGRESS_COUNT = "scan_progress_count"
+        private const val NOTIFICATION_ID = 2001
+        private const val CHANNEL_ID = "scan_worker_channel"
+    }
+
+    override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo("Preparing scan…")
+
+    private fun buildForegroundInfo(text: String): ForegroundInfo {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID, "File Scan",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { setShowBadge(false) }
+            val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(channel)
+        }
+        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("FileVault Pro")
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(NOTIFICATION_ID, notification)
+        }
     }
 
     private suspend fun updateProgress(count: Int, stage: String) {
-        setProgressAsync(workDataOf(KEY_PROGRESS_COUNT to count, KEY_PROGRESS_STAGE to stage))
+        setProgress(workDataOf(KEY_PROGRESS_COUNT to count, KEY_PROGRESS_STAGE to stage))
     }
 
     override suspend fun doWork(): Result {
         val isInitial = inputData.getBoolean(KEY_IS_INITIAL, false)
         Log.d(TAG, "ScanWorker starting (initial=$isInitial)")
         return try {
+            setForeground(buildForegroundInfo("Starting scan…"))
             var totalCount = 0
 
             updateProgress(0, "Scanning MediaStore…")
             val mediaCount = fileRepository.performMediaStoreScan()
             totalCount += mediaCount
             Log.d(TAG, "MediaStore scan: $mediaCount files")
-            updateProgress(mediaCount, "Scanning MediaStore…")
+            updateProgress(mediaCount, "MediaStore done, walking filesystem…")
 
             val fsCount = fileRepository.performFileSystemWalk { folder, count ->
                 if (count % 500 == 0) {

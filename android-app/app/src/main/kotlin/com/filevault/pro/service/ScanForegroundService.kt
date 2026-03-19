@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -84,17 +85,25 @@ class ScanForegroundService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START_MONITORING -> {
-                startForeground(NOTIFICATION_ID, buildNotification("Monitoring for file changes…"))
+                startForegroundCompat(buildNotification("Monitoring for file changes…"))
                 mediaStoreObserver.register()
                 Log.d(TAG, "Real-time monitoring started via ContentObserver + FileObserver")
             }
             else -> {
-                startForeground(NOTIFICATION_ID, buildNotification("Scanning your files…"))
+                startForegroundCompat(buildNotification("Scanning your files…"))
                 mediaStoreObserver.register()
                 performScan()
             }
         }
         return START_STICKY
+    }
+
+    private fun startForegroundCompat(notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun performScan() {
