@@ -2,10 +2,10 @@ package com.filevault.pro.data.repository
 
 import android.content.ContentUris
 import android.content.Context
-import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import android.webkit.MimeTypeMap
 import com.filevault.pro.data.local.dao.ExcludedFolderDao
 import com.filevault.pro.data.local.dao.FileEntryDao
@@ -39,6 +39,10 @@ class FileRepositoryImpl @Inject constructor(
     private val fileEntryDao: FileEntryDao,
     private val excludedFolderDao: ExcludedFolderDao
 ) : FileRepository {
+
+    private companion object {
+        const val TAG = "FileRepository"
+    }
 
     override fun getAllPhotos(
         sortOrder: SortOrder,
@@ -124,19 +128,23 @@ class FileRepositoryImpl @Inject constructor(
 
     override suspend fun performMediaStoreScan(): Int {
         var count = 0
-        val projection = arrayOf(
-            MediaStore.Files.FileColumns._ID,
-            MediaStore.Files.FileColumns.DATA,
-            MediaStore.Files.FileColumns.DISPLAY_NAME,
-            MediaStore.Files.FileColumns.SIZE,
-            MediaStore.Files.FileColumns.DATE_MODIFIED,
-            MediaStore.Files.FileColumns.MIME_TYPE,
-            MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME,
-            MediaStore.Files.FileColumns.BUCKET_ID,
-            MediaStore.Files.FileColumns.WIDTH,
-            MediaStore.Files.FileColumns.HEIGHT,
-            MediaStore.Files.FileColumns.DATE_ADDED
-        )
+        var skippedCount = 0
+        val projection = buildList {
+            add(MediaStore.Files.FileColumns._ID)
+            add(MediaStore.Files.FileColumns.DATA)
+            add(MediaStore.Files.FileColumns.DISPLAY_NAME)
+            add(MediaStore.Files.FileColumns.SIZE)
+            add(MediaStore.Files.FileColumns.DATE_MODIFIED)
+            add(MediaStore.Files.FileColumns.MIME_TYPE)
+            add(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME)
+            add(MediaStore.Files.FileColumns.BUCKET_ID)
+            add(MediaStore.Files.FileColumns.WIDTH)
+            add(MediaStore.Files.FileColumns.HEIGHT)
+            add(MediaStore.Files.FileColumns.DATE_ADDED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(MediaStore.MediaColumns.RELATIVE_PATH)
+            }
+        }.toTypedArray()
 
         val cursor = context.contentResolver.query(
             MediaStore.Files.getContentUri("external"),
@@ -151,29 +159,54 @@ class FileRepositoryImpl @Inject constructor(
             val entities = mutableListOf<FileEntryEntity>()
 
             while (it.moveToNext()) {
-                val path = it.getString(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)) ?: continue
-                if (excluded.any { ex -> path.startsWith(ex) }) continue
+                val rawPath = it.getString(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA))
+                val relativePath = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    it.getString(it.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH))
+                } else null
+                val displayName = it.getString(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME))
+                val path = when {
+                    !rawPath.isNullOrBlank() -> rawPath
+                    !relativePath.isNullOrBlank() && !displayName.isNullOrBlank() -> {
+                        val rel = relativePath.trimStart('/').let { if (it.endsWith("/")) it else "$it/" }
+                        "${Environment.getExternalStorageDirectory().absolutePath}/$rel$displayName"
+                    }
+                    else -> {
+                        val id = it.getLong(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID))
+                        ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id).toString()
+                    }
+                }
+                if (path.isBlank()) {
+                    skippedCount++
+                    continue
+                }
 
-                val name = it.getString(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)) ?: File(path).name
+                val parentPath = if (path.startsWith("content://")) null else File(path).parent
+                if (parentPath != null && excluded.any { ex -> parentPath.startsWith(ex) }) continue
+
+                val name = displayName ?: File(path).name
                 val size = it.getLong(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE))
                 val modified = it.getLong(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)) * 1000L
                 val mimeRaw = it.getString(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MIME_TYPE)) ?: ""
-                val mime = mimeRaw.ifBlank { FileUtils.getMimeType(File(path)) }
-                val bucketName = it.getString(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME)) ?: File(path).parent?.let { p -> File(p).name } ?: ""
+                val mime = mimeRaw.ifBlank {
+                    if (path.startsWith("content://")) "" else FileUtils.getMimeType(File(path))
+                }
+                val bucketName = it.getString(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME))
+                    ?: parentPath?.let { p -> File(p).name } ?: ""
                 val width = runCatching { it.getInt(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.WIDTH)) }.getOrNull()
                 val height = runCatching { it.getInt(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.HEIGHT)) }.getOrNull()
                 val dateAdded = it.getLong(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_ADDED)) * 1000L
 
                 val fileType = if (mime.isNotBlank()) FileType.fromMimeType(mime)
-                              else FileType.fromExtension(File(path).extension)
+                              else if (!path.startsWith("content://")) FileType.fromExtension(File(path).extension)
+                              else FileType.OTHER
 
-                val parentPath = File(path).parent ?: ""
+                val resolvedParentPath = parentPath ?: ""
 
                 entities.add(
                     FileEntryEntity(
                         path = path,
                         name = name,
-                        folderPath = parentPath,
+                        folderPath = resolvedParentPath,
                         folderName = bucketName,
                         sizeBytes = size,
                         lastModified = modified,
@@ -188,7 +221,7 @@ class FileRepositoryImpl @Inject constructor(
                         hasGps = false,
                         dateTaken = null,
                         dateAdded = dateAdded,
-                        isHidden = FileUtils.isHidden(File(path)),
+                        isHidden = if (path.startsWith("content://")) false else FileUtils.isHidden(File(path)),
                         contentHash = null,
                         thumbnailCachePath = null,
                         isSyncIgnored = false,
@@ -208,13 +241,17 @@ class FileRepositoryImpl @Inject constructor(
                 fileEntryDao.upsertAll(entities)
                 count += entities.size
             }
+
+            if (skippedCount > 0) {
+                Log.d(TAG, "Skipped $skippedCount MediaStore entries because the file path could not be resolved")
+            }
         }
 
         return count
     }
 
     override suspend fun performFileSystemWalk(
-        onProgress: (folder: String, count: Int) -> Unit
+        onProgress: suspend (folder: String, count: Int) -> Unit
     ): Int = withContext(Dispatchers.IO) {
         var count = 0
         val excluded = excludedFolderDao.getAllPaths().toSet()

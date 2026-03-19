@@ -1,7 +1,13 @@
 package com.filevault.pro.presentation.screen.dashboard
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +31,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.filevault.pro.domain.model.CatalogStats
@@ -50,13 +58,30 @@ fun DashboardScreen(
     val recentFiles by viewModel.recentFiles.collectAsState()
     val lastScanAt by viewModel.lastScanAt.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val scanProgressCount by viewModel.scanProgressCount.collectAsState()
+    val scanStage by viewModel.scanStage.collectAsState()
+
+    val context = LocalContext.current
+    val hasMediaAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+    } else {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+    }
+    val hasAllFilesAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager() else true
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item {
-            HeaderSection(isScanning = isScanning, onScanNow = viewModel::triggerScan)
+            HeaderSection(
+                isScanning = isScanning,
+                scanProgressCount = scanProgressCount,
+                scanStage = scanStage,
+                onScanNow = viewModel::triggerScan
+            )
         }
         item { Spacer(Modifier.height(16.dp)) }
         item {
@@ -70,6 +95,21 @@ fun DashboardScreen(
             ScanStatusCard(lastScanAt = lastScanAt, isScanning = isScanning, onScanNow = viewModel::triggerScan)
         }
         item { Spacer(Modifier.height(16.dp)) }
+        item {
+            if (!isScanning && stats != null && stats.totalFiles == 0) {
+                ScanTroubleshootCard(
+                    hasMediaAccess = hasMediaAccess,
+                    hasAllFilesAccess = hasAllFilesAccess,
+                    onOpenPermissions = {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        context.startActivity(intent)
+                    }
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+        }
         if (syncProfiles.isNotEmpty()) {
             item { SyncStatusSection(syncProfiles = syncProfiles, onManageSync = onNavigateToSync) }
             item { Spacer(Modifier.height(16.dp)) }
@@ -90,7 +130,12 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun HeaderSection(isScanning: Boolean, onScanNow: () -> Unit) {
+private fun HeaderSection(
+    isScanning: Boolean,
+    scanProgressCount: Int?,
+    scanStage: String?,
+    onScanNow: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -133,6 +178,35 @@ private fun HeaderSection(isScanning: Boolean, onScanNow: () -> Unit) {
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
+                }
+            }
+
+            if (isScanning) {
+                Spacer(Modifier.height(16.dp))
+
+                if (scanProgressCount != null) {
+                    Text(
+                        "Scanned ${scanProgressCount} files",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    val progress = (scanProgressCount / 10000f).coerceAtMost(1f)
+                    LinearProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+
+                if (!scanStage.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        scanStage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
                 }
             }
         }
@@ -284,6 +358,44 @@ private fun ScanStatusCard(lastScanAt: Long?, isScanning: Boolean, onScanNow: ()
             }
             if (!isScanning) {
                 TextButton(onClick = onScanNow) { Text("Scan Now") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScanTroubleshootCard(
+    hasMediaAccess: Boolean,
+    hasAllFilesAccess: Boolean,
+    onOpenPermissions: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("No files found", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Scan completed but didn\'t find any files. This can happen if the app doesn\'t have access to your storage.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Spacer(Modifier.height(12.dp))
+            if (!hasMediaAccess) {
+                Text("• Grant media access (photos/videos/audio)", style = MaterialTheme.typography.bodySmall)
+            }
+            if (!hasAllFilesAccess) {
+                Text("• Grant All Files Access (required for full device scan)", style = MaterialTheme.typography.bodySmall)
+            }
+            if (hasMediaAccess && hasAllFilesAccess) {
+                Text("• If you still see 0 files, try running the scan again or restarting the app.",
+                    style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = onOpenPermissions, modifier = Modifier.fillMaxWidth()) {
+                Text("Open Permissions")
             }
         }
     }

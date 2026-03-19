@@ -105,9 +105,9 @@ class ScanForegroundService : Service() {
                 val mediaCount = fileRepository.performMediaStoreScan()
 
                 updateNotification("Walking file system… ($mediaCount files found)")
-                val fsCount = fileRepository.performFileSystemWalk { folder, count ->
+                val fsCount = fileRepository.performFileSystemWalk(suspend { folder, count ->
                     if (count % 500 == 0) updateNotification("Scanning… $count files indexed")
-                }
+                })
 
                 appPreferences.setLastScanAt(System.currentTimeMillis())
                 appPreferences.setInitialScanDone(true)

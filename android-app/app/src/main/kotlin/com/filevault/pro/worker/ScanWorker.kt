@@ -25,6 +25,12 @@ class ScanWorker @AssistedInject constructor(
     companion object {
         private const val TAG = "ScanWorker"
         const val KEY_IS_INITIAL = "is_initial_scan"
+        const val KEY_PROGRESS_STAGE = "scan_progress_stage"
+        const val KEY_PROGRESS_COUNT = "scan_progress_count"
+    }
+
+    private suspend fun updateProgress(count: Int, stage: String) {
+        setProgressAsync(workDataOf(KEY_PROGRESS_COUNT to count, KEY_PROGRESS_STAGE to stage))
     }
 
     override suspend fun doWork(): Result {
@@ -33,15 +39,21 @@ class ScanWorker @AssistedInject constructor(
         return try {
             var totalCount = 0
 
+            updateProgress(0, "Scanning MediaStore…")
             val mediaCount = fileRepository.performMediaStoreScan()
             totalCount += mediaCount
             Log.d(TAG, "MediaStore scan: $mediaCount files")
+            updateProgress(mediaCount, "Scanning MediaStore…")
 
-            val fsCount = fileRepository.performFileSystemWalk { folder, count ->
-                Log.v(TAG, "Walking: $folder ($count files so far)")
-            }
+            val fsCount = fileRepository.performFileSystemWalk(suspend { folder, count ->
+                if (count % 500 == 0) {
+                    Log.v(TAG, "Walking: $folder ($count files so far)")
+                    updateProgress(count, "Walking filesystem…")
+                }
+            })
             totalCount += fsCount
             Log.d(TAG, "File system walk: $fsCount files")
+            updateProgress(totalCount, "Scan complete")
 
             appPreferences.setLastScanAt(System.currentTimeMillis())
             if (isInitial) {

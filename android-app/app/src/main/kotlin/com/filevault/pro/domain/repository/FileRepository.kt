@@ -17,5 +17,5 @@ interface FileRepository {
     suspend fun getUnsyncedFiles(types: List<FileType> = emptyList()): List<FileEntry>
     suspend fun getDuplicates(): List<DuplicateGroup>
     suspend fun performMediaStoreScan(): Int
-    suspend fun performFileSystemWalk(onProgress: (folder: String, count: Int) -> Unit): Int
+    suspend fun performFileSystemWalk(onProgress: suspend (folder: String, count: Int) -> Unit): Int
 }
