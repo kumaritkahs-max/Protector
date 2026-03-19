@@ -110,19 +110,15 @@ class ScanForegroundService : Service() {
         scope.launch {
             Log.d(TAG, "Foreground scan starting")
             try {
-                updateNotification("Scanning via MediaStore…")
+                updateNotification("Reading MediaStore…")
                 val mediaCount = fileRepository.performMediaStoreScan()
 
-                updateNotification("Walking file system… ($mediaCount files found)")
-                val fsCount = fileRepository.performFileSystemWalk { folder, count ->
-                    if (count % 500 == 0) updateNotification("Scanning… $count files indexed")
-                }
-
                 appPreferences.setLastScanAt(System.currentTimeMillis())
+                appPreferences.setLastScanCount(mediaCount)
                 appPreferences.setInitialScanDone(true)
 
-                updateNotification("Scan complete: ${mediaCount + fsCount} files cataloged")
-                Log.d(TAG, "Foreground scan complete: ${mediaCount + fsCount} files")
+                updateNotification("Scan complete: $mediaCount files cataloged")
+                Log.d(TAG, "Foreground scan complete: $mediaCount files")
             } catch (e: Exception) {
                 Log.e(TAG, "Scan error: ${e.message}", e)
             } finally {

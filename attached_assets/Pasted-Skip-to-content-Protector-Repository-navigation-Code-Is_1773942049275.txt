@@ -1,0 +1,124 @@
+Skip to content
+Protector
+Repository navigation
+Code
+Issues
+Actions
+Build Debug APK
+Improve media scanning reliability and efficiency #17
+Annotations
+1 warning
+Build Debug APK
+succeeded 6 minutes ago in 2m 43s
+2s
+1s
+32s
+0s
+12s
+34s
+0s
+1m 14s
+Run bash ./gradlew assembleDebug --no-daemon --stacktrace
+
+Welcome to Gradle 8.9!
+
+Here are the highlights of this release:
+ - Enhanced Error and Warning Messages
+ - IDE Integration Improvements
+ - Daemon JVM Information
+
+For more details see https://docs.gradle.org/8.9/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Configuration on demand is an incubating feature.
+
+> Configure project :app
+WARNING: The option setting 'android.defaults.buildfeatures.buildconfig=true' is deprecated.
+The current default is 'false'.
+It will be removed in version 9.0 of the Android Gradle plugin.
+To keep using this feature, add the following to your module-level build.gradle files:
+    android.buildFeatures.buildConfig = true
+or from Android Studio, click: `Refactor` > `Migrate BuildConfig to Gradle Build Files`.
+WARNING: The following problems were found when resolving the SDK location:
+Where: sdk.dir property in local.properties file. Problem: Directory does not exist
+
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig FROM-CACHE
+> Task :app:generateDebugResValues FROM-CACHE
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources FROM-CACHE
+> Task :app:mergeDebugResources FROM-CACHE
+> Task :app:packageDebugResources FROM-CACHE
+> Task :app:parseDebugLocalResources FROM-CACHE
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug FROM-CACHE
+> Task :app:processDebugMainManifest FROM-CACHE
+> Task :app:processDebugManifest FROM-CACHE
+> Task :app:processDebugManifestForPackage FROM-CACHE
+> Task :app:processDebugResources FROM-CACHE
+> Task :app:javaPreCompileDebug FROM-CACHE
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets FROM-CACHE
+> Task :app:desugarDebugFileDependencies FROM-CACHE
+> Task :app:mergeDebugJniLibFolders
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugNativeLibs
+> Task :app:mergeExtDexDebug FROM-CACHE
+> Task :app:mergeLibDexDebug FROM-CACHE
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so.
+
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/dashboard/DashboardScreen.kt:439:72 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/dashboard/DashboardScreen.kt:525:43 'val Icons.Filled.CompareArrows: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.CompareArrows.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/detail/FileDetailScreen.kt:73:49 'val Icons.Filled.OpenInNew: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.OpenInNew.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/duplicates/DuplicatesScreen.kt:92:44 'val Icons.Filled.CompareArrows: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.CompareArrows.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/duplicates/DuplicatesScreen.kt:153:44 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/files/FilesScreen.kt:152:73 'val Icons.Filled.List: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.List.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/files/FilesScreen.kt:154:97 'val Icons.Filled.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/files/FilesScreen.kt:177:114 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/lock/AppLockScreen.kt:196:52 'val Icons.Filled.Backspace: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Backspace.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/onboarding/OnboardingScreen.kt:123:44 'val Icons.Filled.ArrowForward: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowForward.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/photos/PhotosScreen.kt:147:52 'val Icons.Filled.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/photos/PhotosScreen.kt:150:68 'val Icons.Filled.ViewList: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ViewList.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/settings/SettingsScreen.kt:116:42 'val Icons.Filled.CompareArrows: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.CompareArrows.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/sync/SyncProfilesScreen.kt:134:78 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/videos/VideosScreen.kt:142:97 'val Icons.Filled.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug FROM-CACHE
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:transformDebugClassesWithAsm
+> Task :app:mergeDebugJavaResource
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics FROM-CACHE
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 1m 14s
+41 actionable tasks: 23 executed, 18 from cache
+0s
+3s
+0s
+0s
+1s
+0s
+0s

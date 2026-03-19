@@ -1,0 +1,82 @@
+=== FileVault Pro — Storage Diagnostic Report ===
+Android 15 (API 35)
+INFINIX Infinix X6857B
+
+[PASS] All Files Access (MANAGE_EXTERNAL_STORAGE)
+Granted — full file system walk enabled
+
+[PASS] Media Permissions
+READ_MEDIA_IMAGES: ✓
+READ_MEDIA_VIDEO: ✓
+READ_MEDIA_AUDIO: ✓
+
+[PASS] Storage Root Discovery (1 found)
+/storage/emulated/0
+  readable=true  107753MB total  49132MB free
+
+[PASS] Primary External Storage
+State: mounted
+Path: /storage/emulated/0
+Readable: true
+
+[PASS] MediaStore Query
+Total (non-empty files): 30617
+Images: 843  Videos: 28  Audio: 204
+
+[PASS] App Photos/Videos Loading
+Photos screen: MediaStore has 843 images
+  → App now reads directly from MediaStore (no scan needed)
+Videos screen: MediaStore has 28 videos
+  → App now reads directly from MediaStore (no scan needed)
+
+[PASS] File System Walk
+Files found (cap 2000): 2000
+Unreadable dirs: 2
+Samples:
+/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp AI Media/.nomedia
+/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio/Sent/.nomedia
+/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio/Private/.nomedia
+/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Animated Gifs/Sent/.nomedia
+/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Animated Gifs/Private/.nomedia
+
+[PASS] Common Media Directories
+DCIM: exists=true  readable=true  items=2
+Pictures: exists=true  readable=true  items=31
+Movies: exists=true  readable=true  items=5
+Download: exists=true  readable=true  items=108
+Music: exists=true  readable=true  items=5
+Documents: exists=true  readable=true  items=6
+WhatsApp/Media: exists=false  readable=false  items=0
+Telegram: exists=false  readable=false  items=0
+
+--- Raw Log ---
+=== FileVault Pro Diagnostic ===
+Android 15 (API 35)
+INFINIX Infinix X6857B
+
+[1] MANAGE_EXTERNAL_STORAGE...
+    isExternalStorageManager = true
+[2] Media permissions...
+    READ_MEDIA_IMAGES = true
+    READ_MEDIA_VIDEO = true
+    READ_MEDIA_AUDIO = true
+[3] Storage roots...
+    /storage/emulated/0  readable=true  total=107753MB  free=49132MB
+[4] External storage state...
+    state=mounted  path=/storage/emulated/0  readable=true
+[5] MediaStore queries...
+    total=30617  images=843  videos=28  audio=204  err=null
+[6] App loading check...
+[7] File system walk (cap 2000)...
+    files=2000  unreadable_dirs=2
+[8] Common directories...
+    DCIM: exists=true  readable=true  items=2
+    Pictures: exists=true  readable=true  items=31
+    Movies: exists=true  readable=true  items=5
+    Download: exists=true  readable=true  items=108
+    Music: exists=true  readable=true  items=5
+    Documents: exists=true  readable=true  items=6
+    WhatsApp/Media: exists=false  readable=false  items=0
+    Telegram: exists=false  readable=false  items=0
+
+=== Done — Failures: 0  Warnings: 0 ===

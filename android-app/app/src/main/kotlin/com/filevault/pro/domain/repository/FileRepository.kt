@@ -2,6 +2,7 @@ package com.filevault.pro.domain.repository
 
 import com.filevault.pro.domain.model.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface FileRepository {
     fun getAllPhotos(sortOrder: SortOrder, filter: FileFilter): Flow<List<FileEntry>>
@@ -9,6 +10,8 @@ interface FileRepository {
     fun getAllFiles(sortOrder: SortOrder, filter: FileFilter): Flow<List<FileEntry>>
     fun getStats(): Flow<CatalogStats>
     fun getFolders(): Flow<List<FolderInfo>>
+    val isScanRunning: StateFlow<Boolean>
+    val scanSavedCount: StateFlow<Int>
     suspend fun upsertFile(file: FileEntry)
     suspend fun upsertFiles(files: List<FileEntry>)
     suspend fun markDeleted(path: String)

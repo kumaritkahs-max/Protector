@@ -26,6 +26,9 @@ import com.filevault.pro.util.FileUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -47,6 +50,12 @@ class FileRepositoryImpl @Inject constructor(
     }
 
     private val scanMutex = Mutex()
+
+    private val _isScanRunning = MutableStateFlow(false)
+    override val isScanRunning: StateFlow<Boolean> = _isScanRunning.asStateFlow()
+
+    private val _scanSavedCount = MutableStateFlow(0)
+    override val scanSavedCount: StateFlow<Int> = _scanSavedCount.asStateFlow()
 
     override fun getAllPhotos(sortOrder: SortOrder, filter: FileFilter): Flow<List<FileEntry>> =
         fileEntryDao.getAllPhotosFlowAll().map { entities ->
@@ -136,9 +145,12 @@ class FileRepositoryImpl @Inject constructor(
             return@withContext 0
         }
         scanMutex.withLock {
+        _isScanRunning.value = true
+        _scanSavedCount.value = 0
+        var total = 0
+        try {
         val seenPaths = HashSet<String>(1024)
         val excluded  = excludedFolderDao.getAllPaths().toSet()
-        var total = 0
 
         fun baseProjection(vararg extra: String): Array<String> = buildList {
             add(MediaStore.MediaColumns._ID)
@@ -271,6 +283,7 @@ class FileRepositoryImpl @Inject constructor(
                 entities.chunked(500).forEach { chunk ->
                     fileEntryDao.upsertAll(chunk)
                     n += chunk.size
+                    _scanSavedCount.value += chunk.size
                 }
             }
             Log.d(TAG, "  $uri → $n new entries (dedup pool: ${seenPaths.size})")
@@ -330,6 +343,9 @@ class FileRepositoryImpl @Inject constructor(
         }
 
         Log.d(TAG, "performMediaStoreScan: complete — indexed $total files")
+        } finally {
+            _isScanRunning.value = false
+        }
         total
         } // end scanMutex.withLock
     }
