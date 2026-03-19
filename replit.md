@@ -1,8 +1,33 @@
-# Workspace
+# FileVault Pro Workspace
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+FileVault Pro is an Android file management and cataloging app paired with a pnpm TypeScript monorepo for shared tooling and API infrastructure. The Android app performs deep storage scanning on Android 10–15 and syncs files to Telegram or Email.
+
+## Android App (`android-app/`)
+
+### Key Architecture
+- **Scanning**: `FileRepositoryImpl` — MediaStore query + File system walk
+- **Background scan**: `ScanWorker` (WorkManager) and `ScanForegroundService`
+- **Real-time monitoring**: `MediaStoreObserver` (ContentObserver + FileObserver)
+- **UI**: Jetpack Compose + Material 3, Hilt DI, Room DB
+
+### Critical Android 15 (API 35) Compatibility Notes
+- `MANAGE_EXTERNAL_STORAGE` must be granted via Settings > Apps > All Files Access — the app checks `Environment.isExternalStorageManager()` at runtime in `performFileSystemWalk()` and will return 0 files with a log warning if not granted
+- `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO` are required for MediaStore queries on Android 13+
+- `getExternalStorageRoots()` uses `StorageManager.getStorageVolumes()` on Android 10+ to find all volumes (primary + SD card + OTG)
+- `PermissionScreen` uses `LifecycleEventObserver` on `ON_RESUME` to auto-recheck `MANAGE_EXTERNAL_STORAGE` after the user returns from system settings
+- `android:largeHeap="true"` is set for large file catalog operations
+
+### GitHub Actions Build
+- Workflow: `.github/workflows/build-debug-apk.yml`
+- Runs on `ubuntu-22.04`, JDK 17, targets Android 15 (compileSdk 35)
+- Uses pre-installed Android SDK from runner + installs `platforms;android-35` and `build-tools;35.0.0`
+- Uploads debug APK as artifact (retained 30 days)
+
+---
+
+## Monorepo (TypeScript/Node.js)
 
 ## Stack
 

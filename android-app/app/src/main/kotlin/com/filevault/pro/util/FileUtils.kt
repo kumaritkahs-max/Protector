@@ -2,9 +2,11 @@ package com.filevault.pro.util
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
-import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.os.storage.StorageManager
 import android.webkit.MimeTypeMap
+import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import com.filevault.pro.domain.model.FileType
 import kotlinx.coroutines.Dispatchers
@@ -110,11 +112,42 @@ object FileUtils {
         return false
     }
 
-    fun getExternalStorageRoots(): List<File> {
-        val roots = mutableListOf<File>()
+    /**
+     * Returns all accessible external storage roots.
+     * On Android 10+ uses StorageManager to enumerate all volumes
+     * (primary + secondary/SD card + OTG) so nothing is missed.
+     * Always falls back to the primary external storage directory.
+     */
+    fun getExternalStorageRoots(context: Context): List<File> {
+        val roots = LinkedHashSet<File>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+            val volumes = storageManager.storageVolumes
+            for (vol in volumes) {
+                val dir = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    vol.directory
+                } else {
+                    null
+                }
+                if (dir != null && dir.exists() && dir.canRead()) {
+                    roots.add(dir)
+                }
+            }
+        }
+
+        val externalDirs = ContextCompat.getExternalFilesDirs(context, null)
+        for (dir in externalDirs) {
+            if (dir == null) continue
+            var root: File = dir
+            repeat(4) { root = root.parentFile ?: return@repeat }
+            if (root.exists()) roots.add(root)
+        }
+
         val primary = Environment.getExternalStorageDirectory()
         if (primary.exists()) roots.add(primary)
-        return roots
+
+        return roots.toList()
     }
 
     fun getFileIcon(fileType: FileType, mimeType: String): String {

@@ -146,15 +146,35 @@ class FileRepositoryImpl @Inject constructor(
             }
         }.toTypedArray()
 
-        val cursor = context.contentResolver.query(
-            MediaStore.Files.getContentUri("external"),
-            projection,
-            "${MediaStore.Files.FileColumns.SIZE} > 0",
-            null,
-            "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
-        )
+        Log.d(TAG, "performMediaStoreScan: querying MediaStore.Files on URI=${MediaStore.Files.getContentUri("external")}")
 
-        cursor?.use {
+        val cursor = try {
+            context.contentResolver.query(
+                MediaStore.Files.getContentUri("external"),
+                projection,
+                "${MediaStore.Files.FileColumns.SIZE} > 0",
+                null,
+                "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "performMediaStoreScan: contentResolver.query threw an exception — likely missing READ_MEDIA_* permissions. ${e.message}", e)
+            null
+        }
+
+        if (cursor == null) {
+            Log.e(
+                TAG,
+                "performMediaStoreScan: cursor is NULL. This means the app does not have the required " +
+                    "READ_MEDIA_IMAGES / READ_MEDIA_VIDEO / READ_MEDIA_AUDIO (Android 13+) or " +
+                    "READ_EXTERNAL_STORAGE (Android ≤12) permission granted at runtime. " +
+                    "Grant the permissions on the Permission screen and try again."
+            )
+            return 0
+        }
+
+        Log.d(TAG, "performMediaStoreScan: cursor returned ${cursor.count} raw rows from MediaStore")
+
+        cursor.use {
             val excluded = excludedFolderDao.getAllPaths().toSet()
             val entities = mutableListOf<FileEntryEntity>()
 
@@ -167,7 +187,7 @@ class FileRepositoryImpl @Inject constructor(
                 val path = when {
                     !rawPath.isNullOrBlank() -> rawPath
                     !relativePath.isNullOrBlank() && !displayName.isNullOrBlank() -> {
-                        val rel = relativePath.trimStart('/').let { if (it.endsWith("/")) it else "$it/" }
+                        val rel = relativePath.trimStart('/').let { r -> if (r.endsWith("/")) r else "$r/" }
                         "${Environment.getExternalStorageDirectory().absolutePath}/$rel$displayName"
                     }
                     else -> {
@@ -247,17 +267,43 @@ class FileRepositoryImpl @Inject constructor(
             }
         }
 
+        Log.d(TAG, "performMediaStoreScan: indexed $count files into Room")
         return count
     }
 
     override suspend fun performFileSystemWalk(
         onProgress: suspend (folder: String, count: Int) -> Unit
     ): Int = withContext(Dispatchers.IO) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                Log.w(
+                    TAG,
+                    "performFileSystemWalk: MANAGE_EXTERNAL_STORAGE not granted at runtime. " +
+                        "Skipping file system walk. Go to Settings > Apps > FileVaultPro > " +
+                        "Permissions and enable 'All files access'."
+                )
+                return@withContext 0
+            }
+        }
+
         var count = 0
         val excluded = excludedFolderDao.getAllPaths().toSet()
-        val roots = FileUtils.getExternalStorageRoots()
+        val roots = FileUtils.getExternalStorageRoots(context)
+
+        if (roots.isEmpty()) {
+            Log.w(TAG, "performFileSystemWalk: no accessible storage roots found — nothing to walk")
+            return@withContext 0
+        }
+
+        Log.d(TAG, "performFileSystemWalk: walking ${roots.size} root(s): ${roots.map { it.absolutePath }}")
 
         for (root in roots) {
+            if (!root.exists() || !root.canRead()) {
+                Log.w(TAG, "performFileSystemWalk: skipping root ${root.absolutePath} — not accessible")
+                continue
+            }
+
             val buffer = mutableListOf<FileEntryEntity>()
 
             root.walkTopDown()
@@ -306,6 +352,8 @@ class FileRepositoryImpl @Inject constructor(
                 buffer.clear()
             }
         }
+
+        Log.d(TAG, "performFileSystemWalk: indexed $count files into Room")
         count
     }
 

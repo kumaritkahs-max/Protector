@@ -27,10 +27,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.google.accompanist.permissions.*
 import kotlinx.coroutines.delay
 
@@ -45,6 +47,7 @@ data class PermissionItem(
 @Composable
 fun PermissionScreen(onPermissionsGranted: () -> Unit) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var visible by remember { mutableStateOf(false) }
     var allFilesGranted by remember {
         mutableStateOf(
@@ -53,9 +56,24 @@ fun PermissionScreen(onPermissionsGranted: () -> Unit) {
         )
     }
 
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                allFilesGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                    Environment.isExternalStorageManager()
+                else true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val storagePermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO,
-               Manifest.permission.READ_MEDIA_AUDIO)
+        listOf(
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.READ_MEDIA_AUDIO
+        )
     } else {
         listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
@@ -64,13 +82,17 @@ fun PermissionScreen(onPermissionsGranted: () -> Unit) {
         permissions = storagePermissions + listOf(Manifest.permission.POST_NOTIFICATIONS)
     )
 
+    val mediaPermissionsGranted = multiplePermissionsState.permissions
+        .filter { it.permission != Manifest.permission.POST_NOTIFICATIONS }
+        .all { it.status.isGranted }
+
     LaunchedEffect(Unit) {
         delay(300)
         visible = true
     }
 
-    LaunchedEffect(multiplePermissionsState.allPermissionsGranted, allFilesGranted) {
-        if (multiplePermissionsState.allPermissionsGranted && allFilesGranted) {
+    LaunchedEffect(mediaPermissionsGranted, allFilesGranted) {
+        if (mediaPermissionsGranted && allFilesGranted) {
             delay(500)
             onPermissionsGranted()
         }
@@ -138,9 +160,7 @@ fun PermissionScreen(onPermissionsGranted: () -> Unit) {
                     title = "Media Access",
                     description = "Read photos, videos & audio files from device storage",
                     icon = Icons.Outlined.Photo,
-                    isGranted = multiplePermissionsState.permissions
-                        .filter { it.permission != Manifest.permission.POST_NOTIFICATIONS }
-                        .all { it.status.isGranted }
+                    isGranted = mediaPermissionsGranted
                 ))
                 add(PermissionItem(
                     title = "All Files Access",
@@ -166,7 +186,7 @@ fun PermissionScreen(onPermissionsGranted: () -> Unit) {
 
             Spacer(Modifier.height(32.dp))
 
-            if (!multiplePermissionsState.allPermissionsGranted) {
+            if (!mediaPermissionsGranted) {
                 Button(
                     onClick = { multiplePermissionsState.launchMultiplePermissionRequest() },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -197,11 +217,22 @@ fun PermissionScreen(onPermissionsGranted: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
             }
 
+            if (mediaPermissionsGranted && !allFilesGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Text(
+                    "After granting All Files Access in Settings, return to this screen — it will advance automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+
             TextButton(
                 onClick = {
                     allFilesGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
                         Environment.isExternalStorageManager() else true
-                    if (multiplePermissionsState.allPermissionsGranted && allFilesGranted) {
+                    if (mediaPermissionsGranted && allFilesGranted) {
                         onPermissionsGranted()
                     }
                 }
