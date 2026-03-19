@@ -32,6 +32,7 @@ import com.filevault.pro.presentation.screen.sync.SyncProfilesScreen
 import com.filevault.pro.presentation.screen.sync.AddSyncProfileScreen
 import com.filevault.pro.presentation.screen.videos.VideosScreen
 import com.filevault.pro.presentation.screen.crashlog.CrashLogScreen
+import com.filevault.pro.presentation.screen.diagnostic.DiagnosticScreen
 import com.filevault.pro.presentation.screen.notifications.NotificationCenterScreen
 import java.net.URLEncoder
 
@@ -57,6 +58,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
     }
     object Notifications : Screen("notifications", "Notifications")
     object CrashLog : Screen("crash_log", "Crash Logs")
+    object Diagnostic : Screen("diagnostic", "Storage Diagnostic")
 }
 
 val bottomNavItems = listOf(Screen.Dashboard, Screen.Photos, Screen.Videos, Screen.Files, Screen.Settings)
@@ -160,7 +162,8 @@ fun AppNavGraph() {
                     onNavigateToDuplicates = { navController.navigate(Screen.Duplicates.route) },
                     onNavigateToFolders = { navController.navigate(Screen.Folders.route) },
                     onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
-                    onNavigateToCrashLog = { navController.navigate(Screen.CrashLog.route) }
+                    onNavigateToCrashLog = { navController.navigate(Screen.CrashLog.route) },
+                    onNavigateToDiagnostic = { navController.navigate(Screen.Diagnostic.route) }
                 )
             }
             composable(Screen.Folders.route) {
@@ -202,6 +205,9 @@ fun AppNavGraph() {
             }
             composable(Screen.CrashLog.route) {
                 CrashLogScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.Diagnostic.route) {
+                DiagnosticScreen(onBack = { navController.popBackStack() })
             }
         }
     }

@@ -30,7 +30,8 @@ fun SettingsScreen(
     onNavigateToDuplicates: () -> Unit,
     onNavigateToFolders: () -> Unit,
     onNavigateToNotifications: () -> Unit = {},
-    onNavigateToCrashLog: () -> Unit = {}
+    onNavigateToCrashLog: () -> Unit = {},
+    onNavigateToDiagnostic: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val themeMode by viewModel.themeMode.collectAsState()
@@ -162,6 +163,16 @@ fun SettingsScreen(
                     subtitle = "Require PIN or biometric to open",
                     checked = appLockEnabled,
                     onCheckedChange = viewModel::setAppLockEnabled
+                )
+            }
+
+            item { SettingsGroup("Diagnostic") }
+            item {
+                SettingsItem(
+                    icon = Icons.Default.Science,
+                    title = "Storage Diagnostic",
+                    subtitle = "Debug why files aren't being fetched — shows permission state, storage roots, MediaStore counts, and file walk results",
+                    onClick = onNavigateToDiagnostic
                 )
             }
 

@@ -1,0 +1,44 @@
+es ago in 1m 51s
+2s
+1s
+7s
+19s
+1s
+2s
+7s
+0s
+1m 7s
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/files/FilesScreen.kt:54:69 'val Icons.Filled.List: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.List.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/files/FilesScreen.kt:56:93 'val Icons.Filled.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/files/FilesScreen.kt:65:77 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/folders/FolderBrowserScreen.kt:49:86 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/lock/AppLockScreen.kt:196:52 'val Icons.Filled.Backspace: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Backspace.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/notifications/NotificationCenterScreen.kt:45:9 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/notifications/NotificationCenterScreen.kt:114:71 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/onboarding/OnboardingScreen.kt:123:44 'val Icons.Filled.ArrowForward: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowForward.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/permission/PermissionScreen.kt:50:26 'val LocalLifecycleOwner: ProvidableCompositionLocal<LifecycleOwner>' is deprecated. Moved to lifecycle-runtime-compose library in androidx.lifecycle.compose package.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/photos/PhotosScreen.kt:63:52 'val Icons.Filled.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/photos/PhotosScreen.kt:66:68 'val Icons.Filled.ViewList: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ViewList.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/settings/SettingsScreen.kt:114:42 'val Icons.Filled.CompareArrows: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.CompareArrows.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/sync/AddSyncProfileScreen.kt:82:86 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/sync/SyncHistoryScreen.kt:35:86 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/sync/SyncProfilesScreen.kt:42:86 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/sync/SyncProfilesScreen.kt:133:78 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/screen/videos/VideosScreen.kt:56:97 'val Icons.Filled.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort.
+w: file:///home/runner/work/Protector/Protector/android-app/app/src/main/kotlin/com/filevault/pro/presentation/theme/Theme.kt:88:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug FROM-CACHE
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:transformDebugClassesWithAsm
+> Task :app:mergeDebugJavaResource
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics FROM-CACHE
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 1m 6s
+42 actionable tasks: 27 executed, 14 from cache, 1 up-to-date
