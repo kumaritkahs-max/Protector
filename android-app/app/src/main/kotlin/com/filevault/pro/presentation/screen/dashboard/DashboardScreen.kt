@@ -63,6 +63,7 @@ fun DashboardScreen(
     val isScanning by viewModel.isScanning.collectAsState()
     val scanProgressCount by viewModel.scanProgressCount.collectAsState()
     val scanStage by viewModel.scanStage.collectAsState()
+    val folderBreakdown by viewModel.folderBreakdown
 
     val context = LocalContext.current
     val hasMediaAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -89,7 +90,7 @@ fun DashboardScreen(
         item { Spacer(Modifier.height(16.dp)) }
         item {
             val currentStats = stats
-            if (currentStats != null) StatsGridSection(currentStats, onNavigateToPhotos, onNavigateToVideos, onNavigateToFiles)
+            if (currentStats != null) StatsGridSection(currentStats, onNavigateToPhotos, onNavigateToVideos, onNavigateToFiles, folderBreakdown, viewModel::loadFolderBreakdown)
             else Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -227,7 +228,9 @@ private fun StatsGridSection(
     stats: CatalogStats,
     onPhotos: () -> Unit,
     onVideos: () -> Unit,
-    onFiles: () -> Unit
+    onFiles: () -> Unit,
+    folderBreakdown: List<com.filevault.pro.domain.model.FolderInfo>,
+    onLoadFolderDetails: () -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -268,7 +271,11 @@ private fun StatsGridSection(
             )
         }
         Spacer(Modifier.height(12.dp))
-        StorageCard(stats = stats)
+        StorageCard(
+            stats = stats,
+            folderBreakdown = folderBreakdown,
+            onLoadFolderDetails = onLoadFolderDetails
+        )
     }
 }
 
@@ -306,7 +313,11 @@ private fun StatCard(
 }
 
 @Composable
-private fun StorageCard(stats: CatalogStats) {
+private fun StorageCard(
+    stats: CatalogStats,
+    folderBreakdown: List<com.filevault.pro.domain.model.FolderInfo>,
+    onLoadFolderDetails: () -> Unit
+) {
     var showBreakdown by remember { mutableStateOf(false) }
     var showFolderDetails by remember { mutableStateOf(false) }
 
@@ -397,9 +408,9 @@ private fun StorageCard(stats: CatalogStats) {
 
     if (showFolderDetails) {
         LaunchedEffect(showFolderDetails) {
-            if (showFolderDetails) viewModel.loadFolderBreakdown()
+            if (showFolderDetails) onLoadFolderDetails()
         }
-        val folderBreakdown = viewModel.folderBreakdown.value
+        // folderBreakdown is passed from parent DashboardScreen
         AlertDialog(
             onDismissRequest = { showFolderDetails = false },
             title = { Text("Folder Details", fontWeight = FontWeight.Bold) },
@@ -410,7 +421,7 @@ private fun StorageCard(stats: CatalogStats) {
                     }
                 } else {
                     Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
-                        folderBreakdown.forEach { folder ->
+                        for (folder in folderBreakdown) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
