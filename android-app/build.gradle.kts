@@ -7,10 +7,3 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = uri("https://jitpack.io") }
-    }
-}
