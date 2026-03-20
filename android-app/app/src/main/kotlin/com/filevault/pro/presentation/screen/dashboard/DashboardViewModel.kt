@@ -1,6 +1,8 @@
 package com.filevault.pro.presentation.screen.dashboard
 
 import android.content.Context
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filevault.pro.data.preferences.AppPreferences
@@ -32,8 +34,8 @@ class DashboardViewModel @Inject constructor(
     private val appPreferences: AppPreferences
 ) : ViewModel() {
 
-    private val _folderBreakdown = mutableStateOf<List<com.filevault.pro.domain.model.FolderInfo>>(emptyList())
-    val folderBreakdown: State<List<com.filevault.pro.domain.model.FolderInfo>> get() = _folderBreakdown
+    private val _folderBreakdown = MutableStateFlow<List<com.filevault.pro.domain.model.FolderInfo>>(emptyList())
+    val folderBreakdown: StateFlow<List<com.filevault.pro.domain.model.FolderInfo>> = _folderBreakdown
 
     val stats: StateFlow<CatalogStats?> = fileRepository.getStats()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

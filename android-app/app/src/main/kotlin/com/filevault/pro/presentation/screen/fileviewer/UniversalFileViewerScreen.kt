@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -219,8 +221,8 @@ fun UniversalFileViewerScreen(
                         if (showPicker) {
                             // Simple folder picker using SAF (Storage Access Framework)
                             val launcher = rememberLauncherForActivityResult(
-                                contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
-                                onResult = { uri ->
+                                contract = ActivityResultContracts.OpenDocumentTree(),
+                                onResult = { uri: Uri? ->
                                     showPicker = false
                                     if (uri != null) {
                                         val destDir: File? = com.filevault.pro.util.FileUtils.getFileFromUri(context, uri)

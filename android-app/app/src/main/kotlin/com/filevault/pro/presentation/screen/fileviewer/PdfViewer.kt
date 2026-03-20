@@ -12,6 +12,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,13 +60,13 @@ fun PdfViewer(
             IconButton(onClick = {
                 if (currentPage > 0) currentPage--
             }, enabled = currentPage > 0) {
-                Icon(androidx.compose.material.icons.Icons.Default.ArrowBack, contentDescription = "Previous Page")
+                Icon(Icons.Default.ArrowBack, contentDescription = "Previous Page")
             }
             Text("Page ${currentPage + 1} of $pageCount", style = MaterialTheme.typography.bodyMedium)
             IconButton(onClick = {
                 if (currentPage < pageCount - 1) currentPage++
             }, enabled = currentPage < pageCount - 1) {
-                Icon(androidx.compose.material.icons.Icons.Default.ArrowForward, contentDescription = "Next Page")
+                Icon(Icons.Default.ArrowForward, contentDescription = "Next Page")
             }
         }
         Spacer(Modifier.height(8.dp))
