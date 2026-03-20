@@ -435,7 +435,6 @@ private fun StorageCard(stats: CatalogStats) {
             }
         )
     }
-    }
 }
 
 @Composable
