@@ -53,7 +53,8 @@ fun DashboardScreen(
     onNavigateToFiles: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToBrowse: () -> Unit = {},
-    onNavigateToDuplicates: () -> Unit = {}
+    onNavigateToDuplicates: () -> Unit = {},
+    onFileClick: (String) -> Unit = {}
 ) {
     val stats by viewModel.stats.collectAsState()
     val syncProfiles by viewModel.syncProfiles.collectAsState()
@@ -123,7 +124,7 @@ fun DashboardScreen(
                 SectionTitle("Recent Files", onSeeAll = onNavigateToFiles)
             }
             item {
-                RecentFilesRow(files = recentFiles.take(15))
+                RecentFilesRow(files = recentFiles.take(15), onFileClick = onFileClick)
             }
             item { Spacer(Modifier.height(16.dp)) }
         }
@@ -267,7 +268,7 @@ private fun StatsGridSection(
             )
         }
         Spacer(Modifier.height(12.dp))
-        StorageCard(totalSizeBytes = stats.totalSizeBytes, totalFiles = stats.totalFiles)
+        StorageCard(stats = stats)
     }
 }
 
@@ -305,9 +306,11 @@ private fun StatCard(
 }
 
 @Composable
-private fun StorageCard(totalSizeBytes: Long, totalFiles: Int) {
+private fun StorageCard(stats: CatalogStats) {
+    var showBreakdown by remember { mutableStateOf(false) }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { showBreakdown = true },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -327,12 +330,64 @@ private fun StorageCard(totalSizeBytes: Long, totalFiles: Int) {
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("Catalog Size", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text("${totalFiles.formatCount()} files · ${FileUtils.formatSize(totalSizeBytes)}",
+                Text("${stats.totalFiles.formatCount()} files · ${FileUtils.formatSize(stats.totalSizeBytes)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
             }
             Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
         }
+    }
+
+    if (showBreakdown) {
+        AlertDialog(
+            onDismissRequest = { showBreakdown = false },
+            title = { Text("Catalog Breakdown", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    listOf(
+                        Triple(Icons.Default.Photo, "Photos", stats.totalPhotos),
+                        Triple(Icons.Default.VideoLibrary, "Videos", stats.totalVideos),
+                        Triple(Icons.Default.AudioFile, "Audio", stats.totalAudio),
+                        Triple(Icons.Default.Description, "Documents", stats.totalDocuments),
+                        Triple(Icons.Default.FolderZip, "Other/Archives", stats.totalFiles - stats.totalPhotos - stats.totalVideos - stats.totalAudio - stats.totalDocuments)
+                    ).forEach { (icon, label, count) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(icon, null, modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(12.dp))
+                            Text(label, modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium)
+                            Text(count.formatCount(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold)
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.3f))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Storage, null, modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.secondary)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Total Size", modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold)
+                        Text(FileUtils.formatSize(stats.totalSizeBytes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBreakdown = false }) { Text("Close") }
+            }
+        )
     }
 }
 
@@ -468,24 +523,25 @@ private fun SyncProfileCard(profile: SyncProfile) {
 }
 
 @Composable
-private fun RecentFilesRow(files: List<FileEntry>) {
+private fun RecentFilesRow(files: List<FileEntry>, onFileClick: (String) -> Unit = {}) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(files) { file ->
-            RecentFileThumb(file)
+            RecentFileThumb(file, onClick = { onFileClick(file.path) })
         }
     }
 }
 
 @Composable
-private fun RecentFileThumb(file: FileEntry) {
+private fun RecentFileThumb(file: FileEntry, onClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .size(80.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
     ) {
         if (file.fileType == FileType.PHOTO || file.fileType == FileType.VIDEO) {
             AsyncImage(

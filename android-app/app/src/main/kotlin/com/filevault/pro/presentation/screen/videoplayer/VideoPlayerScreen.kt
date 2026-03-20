@@ -35,6 +35,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.filevault.pro.service.MediaPlaybackService
 import com.filevault.pro.util.FileUtils
+import com.filevault.pro.util.MediaQueue
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.delay
 import java.io.File
@@ -47,7 +48,9 @@ fun VideoPlayerScreen(
 ) {
     val context = LocalContext.current
     val decodedPath = remember(path) { try { URLDecoder.decode(path, "UTF-8") } catch (_: Exception) { path } }
-    val fileName = remember(decodedPath) { File(decodedPath).name }
+
+    var currentPlayPath by remember { mutableStateOf(decodedPath) }
+    val fileName = remember(currentPlayPath) { File(currentPlayPath).name }
 
     var controller by remember { mutableStateOf<MediaController?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -61,6 +64,11 @@ fun VideoPlayerScreen(
     var brightness by remember { mutableFloatStateOf(0.5f) }
     var volume by remember { mutableFloatStateOf(1f) }
 
+    val hasPrev = MediaQueue.hasPrev()
+    val hasNext = MediaQueue.hasNext()
+    val queueSize = MediaQueue.filePaths.size
+    val queuePos = MediaQueue.currentIndex + 1
+
     val playerViewRef = remember { mutableStateOf<PlayerView?>(null) }
 
     LaunchedEffect(Unit) {
@@ -71,11 +79,8 @@ fun VideoPlayerScreen(
         val future = MediaController.Builder(context, sessionToken).buildAsync()
         future.addListener({
             controller = future.get().apply {
-                val uri = if (decodedPath.startsWith("content://")) {
-                    Uri.parse(decodedPath)
-                } else {
-                    Uri.fromFile(File(decodedPath))
-                }
+                val uri = if (currentPlayPath.startsWith("content://")) Uri.parse(currentPlayPath)
+                          else Uri.fromFile(File(currentPlayPath))
                 setMediaItem(MediaItem.fromUri(uri))
                 prepare()
                 playWhenReady = true
@@ -88,11 +93,28 @@ fun VideoPlayerScreen(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) duration = ctrl.duration.coerceAtLeast(0L)
+                when (state) {
+                    Player.STATE_READY -> duration = ctrl.duration.coerceAtLeast(0L)
+                    Player.STATE_ENDED -> {
+                        val next = MediaQueue.goNext()
+                        if (next != null) currentPlayPath = next
+                    }
+                }
             }
         }
         ctrl.addListener(listener)
         playerViewRef.value?.player = ctrl
+    }
+
+    LaunchedEffect(currentPlayPath) {
+        val ctrl = controller ?: return@LaunchedEffect
+        val uri = if (currentPlayPath.startsWith("content://")) Uri.parse(currentPlayPath)
+                  else Uri.fromFile(File(currentPlayPath))
+        ctrl.setMediaItem(MediaItem.fromUri(uri))
+        ctrl.prepare()
+        ctrl.playWhenReady = true
+        currentPosition = 0L
+        duration = 0L
     }
 
     LaunchedEffect(isPlaying) {
@@ -167,14 +189,24 @@ fun VideoPlayerScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
                     }
-                    Text(
-                        fileName,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            fileName,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                        if (queueSize > 1) {
+                            Text(
+                                "$queuePos / $queueSize",
+                                color = Color.White.copy(0.5f),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
                     IconButton(onClick = { showSpeedMenu = true }) {
                         Icon(Icons.Default.Speed, "Speed", tint = Color.White)
                     }
@@ -253,8 +285,14 @@ fun VideoPlayerScreen(
                         controller?.seekTo(newPos)
                         currentPosition = newPos
                     }
-                    VideoControlBtn(Icons.Default.SkipPrevious, "Prev") {
-                        controller?.seekTo(0)
+                    VideoControlBtn(
+                        icon = Icons.Default.SkipPrevious,
+                        label = "Prev",
+                        tint = if (hasPrev) Color.White else Color.White.copy(0.3f)
+                    ) {
+                        val prev = MediaQueue.goPrev()
+                        if (prev != null) currentPlayPath = prev
+                        else { controller?.seekTo(0); currentPosition = 0L }
                     }
                     Box(
                         modifier = Modifier
@@ -274,8 +312,14 @@ fun VideoPlayerScreen(
                             modifier = Modifier.size(36.dp)
                         )
                     }
-                    VideoControlBtn(Icons.Default.SkipNext, "Next") {
-                        controller?.seekTo(duration)
+                    VideoControlBtn(
+                        icon = Icons.Default.SkipNext,
+                        label = "Next",
+                        tint = if (hasNext) Color.White else Color.White.copy(0.3f)
+                    ) {
+                        val next = MediaQueue.goNext()
+                        if (next != null) currentPlayPath = next
+                        else { val dur = duration; if (dur > 0) controller?.seekTo(dur) }
                     }
                     VideoControlBtn(Icons.Default.Forward10, "+10s") {
                         val newPos = (currentPosition + 10000L).coerceAtMost(duration)
@@ -347,9 +391,10 @@ fun VideoPlayerScreen(
 private fun VideoControlBtn(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    tint: Color = Color.White,
     onClick: () -> Unit
 ) {
     IconButton(onClick = onClick) {
-        Icon(icon, label, tint = Color.White, modifier = Modifier.size(28.dp))
+        Icon(icon, label, tint = tint, modifier = Modifier.size(28.dp))
     }
 }
