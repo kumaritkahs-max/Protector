@@ -30,7 +30,6 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.filevault.pro.service.MediaPlaybackService
 import com.filevault.pro.util.FileUtils
-import com.filevault.pro.util.MediaQueue
 import com.google.common.util.concurrent.MoreExecutors
 import java.io.File
 import java.net.URLDecoder
@@ -43,9 +42,7 @@ fun AudioPlayerScreen(
 ) {
     val context = LocalContext.current
     val decodedPath = remember(path) { try { URLDecoder.decode(path, "UTF-8") } catch (_: Exception) { path } }
-
-    var currentPlayPath by remember { mutableStateOf(decodedPath) }
-    val currentFile = remember(currentPlayPath) { File(currentPlayPath) }
+    val file = remember(decodedPath) { File(decodedPath) }
 
     var controller by remember { mutableStateOf<MediaController?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -57,11 +54,7 @@ fun AudioPlayerScreen(
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
     var sleepTimerMinutes by remember { mutableIntStateOf(0) }
-
-    val hasPrev = MediaQueue.hasPrev()
-    val hasNext = MediaQueue.hasNext()
-    val queueSize = MediaQueue.filePaths.size
-    val queuePos = MediaQueue.currentIndex + 1
+    var showEqualizer by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val sessionToken = SessionToken(
@@ -71,8 +64,11 @@ fun AudioPlayerScreen(
         val future = MediaController.Builder(context, sessionToken).buildAsync()
         future.addListener({
             controller = future.get().apply {
-                val uri = if (currentPlayPath.startsWith("content://")) Uri.parse(currentPlayPath)
-                          else Uri.fromFile(File(currentPlayPath))
+                val uri = if (decodedPath.startsWith("content://")) {
+                    Uri.parse(decodedPath)
+                } else {
+                    Uri.fromFile(file)
+                }
                 setMediaItem(MediaItem.fromUri(uri))
                 prepare()
                 playWhenReady = true
@@ -85,31 +81,12 @@ fun AudioPlayerScreen(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlaybackStateChanged(state: Int) {
-                when (state) {
-                    Player.STATE_READY -> duration = ctrl.duration.coerceAtLeast(0L)
-                    Player.STATE_ENDED -> {
-                        if (!isRepeat) {
-                            val next = MediaQueue.goNext()
-                            if (next != null) {
-                                currentPlayPath = next
-                            }
-                        }
-                    }
+                if (state == Player.STATE_READY) {
+                    duration = ctrl.duration.coerceAtLeast(0L)
                 }
             }
         }
         ctrl.addListener(listener)
-    }
-
-    LaunchedEffect(currentPlayPath) {
-        val ctrl = controller ?: return@LaunchedEffect
-        val uri = if (currentPlayPath.startsWith("content://")) Uri.parse(currentPlayPath)
-                  else Uri.fromFile(File(currentPlayPath))
-        ctrl.setMediaItem(MediaItem.fromUri(uri))
-        ctrl.prepare()
-        ctrl.playWhenReady = true
-        currentPosition = 0L
-        duration = 0L
     }
 
     LaunchedEffect(isPlaying) {
@@ -151,24 +128,13 @@ fun AudioPlayerScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Now Playing",
-                        color = Color.White.copy(0.7f),
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (queueSize > 1) {
-                        Text(
-                            "$queuePos / $queueSize",
-                            color = Color.White.copy(0.4f),
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
+                Text(
+                    "Now Playing",
+                    color = Color.White.copy(0.7f),
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
                 IconButton(onClick = { showSpeedMenu = true }) {
                     Icon(Icons.Default.Speed, "Speed", tint = Color.White.copy(0.8f))
                 }
@@ -205,7 +171,7 @@ fun AudioPlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    currentFile.nameWithoutExtension,
+                    file.nameWithoutExtension,
                     color = Color.White,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
@@ -215,7 +181,7 @@ fun AudioPlayerScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    currentFile.extension.uppercase() + " • " + FileUtils.formatSize(currentFile.length()),
+                    file.extension.uppercase() + " • " + FileUtils.formatSize(file.length()),
                     color = Color.White.copy(0.5f),
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
@@ -258,12 +224,10 @@ fun AudioPlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = {
-                        isShuffle = !isShuffle
-                        controller?.shuffleModeEnabled = isShuffle
-                    }
-                ) {
+                IconButton(onClick = {
+                    isShuffle = !isShuffle
+                    controller?.shuffleModeEnabled = isShuffle
+                }) {
                     Icon(
                         Icons.Default.Shuffle,
                         "Shuffle",
@@ -272,20 +236,11 @@ fun AudioPlayerScreen(
                     )
                 }
 
-                IconButton(
-                    onClick = {
-                        val prev = MediaQueue.goPrev()
-                        if (prev != null) currentPlayPath = prev
-                        else { controller?.seekTo(0); currentPosition = 0 }
-                    },
-                    enabled = hasPrev || controller != null
-                ) {
-                    Icon(
-                        Icons.Default.SkipPrevious,
-                        "Previous",
-                        tint = if (hasPrev) Color.White else Color.White.copy(0.3f),
-                        modifier = Modifier.size(36.dp)
-                    )
+                IconButton(onClick = {
+                    controller?.seekTo(0)
+                    currentPosition = 0
+                }) {
+                    Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(36.dp))
                 }
 
                 Box(
@@ -307,20 +262,11 @@ fun AudioPlayerScreen(
                     )
                 }
 
-                IconButton(
-                    onClick = {
-                        val next = MediaQueue.goNext()
-                        if (next != null) currentPlayPath = next
-                        else { val dur = duration; if (dur > 0) controller?.seekTo(dur) }
-                    },
-                    enabled = hasNext || controller != null
-                ) {
-                    Icon(
-                        Icons.Default.SkipNext,
-                        "Next",
-                        tint = if (hasNext) Color.White else Color.White.copy(0.3f),
-                        modifier = Modifier.size(36.dp)
-                    )
+                IconButton(onClick = {
+                    val dur = duration
+                    if (dur > 0) controller?.seekTo(dur)
+                }) {
+                    Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(36.dp))
                 }
 
                 IconButton(onClick = {
@@ -359,7 +305,7 @@ fun AudioPlayerScreen(
                 SmallControl(Icons.Default.Share, "Share") {
                     val intent = Intent(Intent.ACTION_SEND).apply {
                         type = "audio/*"
-                        putExtra(Intent.EXTRA_STREAM, Uri.fromFile(currentFile))
+                        putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file))
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(Intent.createChooser(intent, "Share Audio"))
@@ -439,11 +385,8 @@ fun AudioPlayerScreen(
                             valueRange = 0f..120f,
                             steps = 23
                         )
-                        Text(
-                            "Drag to set timer (0 = off)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(0.5f)
-                        )
+                        Text("Drag to set timer (0 = off)", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
                     }
                 },
                 confirmButton = {

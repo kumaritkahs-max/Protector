@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
@@ -33,8 +32,6 @@ import com.filevault.pro.domain.model.FileEntry
 import com.filevault.pro.domain.model.SortField
 import com.filevault.pro.domain.model.SortOrder
 import com.filevault.pro.util.FileUtils
-import com.filevault.pro.util.MediaQueue
-import com.filevault.pro.util.gridScrollbar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -202,7 +199,6 @@ fun PhotosScreen(
                                         selectedPaths - photo.path
                                     else selectedPaths + photo.path
                                 } else {
-                                    MediaQueue.set(photo.path, photos.map { it.path })
                                     onFileClick(photo.path)
                                 }
                             },
@@ -427,20 +423,9 @@ fun SortBottomSheet(
                             }
                         }
                     },
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .let { m ->
-                            if (currentSort.field == field)
-                                m.background(MaterialTheme.colorScheme.primaryContainer.copy(0.4f))
-                            else m
-                        }
-                        .clickable {
-                            if (currentSort.field == field) {
-                                onSortSelected(currentSort.copy(ascending = !currentSort.ascending))
-                            } else {
-                                onSortSelected(SortOrder(field, false))
-                            }
-                        }
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).let { m ->
+                        if (currentSort.field == field) m.background(MaterialTheme.colorScheme.primaryContainer.copy(0.4f)) else m
+                    }
                 )
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.4f))

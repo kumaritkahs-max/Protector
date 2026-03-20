@@ -34,7 +34,6 @@ import com.filevault.pro.presentation.screen.photos.MultiSelectActionBar
 import com.filevault.pro.presentation.screen.photos.SearchBar
 import com.filevault.pro.presentation.screen.photos.SortBottomSheet
 import com.filevault.pro.util.FileUtils
-import com.filevault.pro.util.MediaQueue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -184,10 +183,7 @@ fun VideosScreen(
                             if (selectedPaths.isNotEmpty()) {
                                 selectedPaths = if (video.path in selectedPaths)
                                     selectedPaths - video.path else selectedPaths + video.path
-                            } else {
-                                MediaQueue.set(video.path, videos.map { it.path })
-                                onFileClick(video.path)
-                            }
+                            } else onFileClick(video.path)
                         },
                         onLongClick = { selectedPaths = selectedPaths + video.path }
                     )
