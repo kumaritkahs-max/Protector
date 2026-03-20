@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 interface FileRepository {
+        suspend fun getFolderBreakdown(): List<FolderInfo>
     fun getAllPhotos(sortOrder: SortOrder, filter: FileFilter): Flow<List<FileEntry>>
     fun getAllVideos(sortOrder: SortOrder, filter: FileFilter): Flow<List<FileEntry>>
     fun getAllFiles(sortOrder: SortOrder, filter: FileFilter): Flow<List<FileEntry>>

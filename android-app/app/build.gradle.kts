@@ -81,6 +81,10 @@ android {
 }
 
 dependencies {
+            // PDFBox for text extraction
+            implementation("com.tom_roush:pdfbox-android:2.0.27.0")
+        // PDF Viewer
+        implementation("com.github.barteksc:android-pdf-viewer:3.2.0-beta.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

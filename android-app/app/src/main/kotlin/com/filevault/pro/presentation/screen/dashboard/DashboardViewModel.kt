@@ -25,6 +25,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+        private val _folderBreakdown = mutableStateOf<List<com.filevault.pro.domain.model.FolderInfo>>(emptyList())
+        val folderBreakdown: State<List<com.filevault.pro.domain.model.FolderInfo>> get() = _folderBreakdown
     @ApplicationContext private val context: Context,
     private val fileRepository: FileRepository,
     private val syncRepository: SyncRepository,
@@ -72,5 +74,11 @@ class DashboardViewModel @Inject constructor(
 
     fun triggerInitialScan() {
         ScanForegroundService.startScan(context)
+    }
+
+    fun loadFolderBreakdown() {
+        viewModelScope.launch {
+            _folderBreakdown.value = fileRepository.getFolderBreakdown()
+        }
     }
 }

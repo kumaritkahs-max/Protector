@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FileEntryDao {
+    @Query("SELECT folder_path, folder_name, COUNT(*) as fileCount, SUM(size_bytes) as totalSizeBytes, MAX(last_modified) as lastModified FROM file_entries WHERE is_deleted_from_device = 0 GROUP BY folder_path, folder_name ORDER BY fileCount DESC")
+    suspend fun getFolderBreakdown(): List<FolderBreakdownRow>
 
     @Upsert
     suspend fun upsert(entity: FileEntryEntity)
@@ -146,6 +148,14 @@ interface FileEntryDao {
 data class FolderRow(
     @ColumnInfo(name = "folder_path") val folderPath: String,
     @ColumnInfo(name = "folder_name") val folderName: String
+)
+
+data class FolderBreakdownRow(
+    @ColumnInfo(name = "folder_path") val folderPath: String,
+    @ColumnInfo(name = "folder_name") val folderName: String,
+    @ColumnInfo(name = "fileCount") val fileCount: Int,
+    @ColumnInfo(name = "totalSizeBytes") val totalSizeBytes: Long?,
+    @ColumnInfo(name = "lastModified") val lastModified: Long?
 )
 
 data class HashCount(

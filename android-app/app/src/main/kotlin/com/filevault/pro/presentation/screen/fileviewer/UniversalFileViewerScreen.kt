@@ -186,8 +186,58 @@ fun UniversalFileViewerScreen(
                         }
                     }
                 }
+                file.extension.lowercase() == "pdf" -> {
+                    PdfViewer(file = file)
+                }
                 state.mode == ViewerMode.BINARY_INFO || state.mode == ViewerMode.ARCHIVE_INFO -> {
-                    FileInfoView(file = file, extraInfo = state.fileInfo)
+                    if (file.extension.lowercase() == "zip" && state.lines.isNotEmpty()) {
+                        var showPicker by remember { mutableStateOf(false) }
+                        var unzipResult by remember { mutableStateOf<String?>(null) }
+                        val context = LocalContext.current
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            FileInfoView(file = file, extraInfo = state.fileInfo)
+                            Spacer(Modifier.height(12.dp))
+                            Text("Files in ZIP:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp))
+                            LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                                itemsIndexed(state.lines) { idx, entry ->
+                                    Text(entry, fontFamily = FontFamily.Monospace, fontSize = 14.sp)
+                                    if (idx < state.lines.size - 1) {
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.2f))
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Button(onClick = { showPicker = true }, modifier = Modifier.align(Alignment.End).padding(16.dp)) {
+                                Icon(Icons.Default.Unarchive, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Unzip to Folder")
+                            }
+                            unzipResult?.let {
+                                Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(16.dp))
+                            }
+                        }
+                        if (showPicker) {
+                            // Simple folder picker using SAF (Storage Access Framework)
+                            val launcher = rememberLauncherForActivityResult(
+                                contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+                                onResult = { uri ->
+                                    showPicker = false
+                                    if (uri != null) {
+                                        val destDir = com.filevault.pro.util.FileUtils.getFileFromUri(context, uri)
+                                        if (destDir != null) {
+                                            val ok = com.filevault.pro.util.ZipUtils.unzip(file, destDir)
+                                            unzipResult = if (ok) "Unzipped successfully to ${destDir.absolutePath}" else "Failed to unzip."
+                                        } else {
+                                            unzipResult = "Failed to resolve folder."
+                                        }
+                                    }
+                                }
+                            )
+                            LaunchedEffect(Unit) { launcher.launch(null) }
+                        }
+                    } else {
+                        FileInfoView(file = file, extraInfo = state.fileInfo)
+                    }
                 }
                 state.mode == ViewerMode.JSON -> {
                     JsonView(
@@ -208,6 +258,7 @@ fun UniversalFileViewerScreen(
             }
 
             if (!state.isLoading && state.error == null && (state.mode == ViewerMode.TEXT || state.mode == ViewerMode.JSON)) {
+                val clipboardManager = LocalContext.current.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 Surface(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -234,6 +285,14 @@ fun UniversalFileViewerScreen(
                                 .padding(start = 4.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = {
+                            val textToCopy = filteredLines.joinToString("\n")
+                            val clip = android.content.ClipData.newPlainText("File Content", textToCopy)
+                            clipboardManager.setPrimaryClip(clip)
+                        }) {
+                            Icon(Icons.Default.ContentCopy, "Copy")
+                        }
                     }
                 }
             }
@@ -545,7 +604,27 @@ private suspend fun loadFile(file: File): ViewerState = withContext(Dispatchers.
     val sizeBytes = file.length()
 
     when {
-        ext in setOf("zip", "rar", "7z", "tar", "gz", "bz2", "xz") -> {
+        ext == "zip" -> {
+            val entries = mutableListOf<String>()
+            try {
+                java.util.zip.ZipFile(file).use { zip ->
+                    val e = zip.entries()
+                    while (e.hasMoreElements()) {
+                        val entry = e.nextElement()
+                        entries.add(entry.name)
+                    }
+                }
+            } catch (e: Exception) {
+                return@withContext ViewerState(isLoading = false, error = "Failed to read ZIP: ${e.message}")
+            }
+            ViewerState(
+                mode = ViewerMode.ARCHIVE_INFO,
+                lines = entries,
+                fileInfo = mapOf("Type" to "ZIP Archive", "Compressed Size" to FileUtils.formatSize(sizeBytes)),
+                isLoading = false
+            )
+        }
+        ext in setOf("rar", "7z", "tar", "gz", "bz2", "xz") -> {
             ViewerState(
                 mode = ViewerMode.ARCHIVE_INFO,
                 fileInfo = mapOf("Type" to "Compressed Archive", "Compressed Size" to FileUtils.formatSize(sizeBytes)),

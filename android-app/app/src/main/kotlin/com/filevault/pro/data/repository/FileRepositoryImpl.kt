@@ -40,6 +40,17 @@ import javax.inject.Singleton
 
 @Singleton
 class FileRepositoryImpl @Inject constructor(
+        override suspend fun getFolderBreakdown(): List<FolderInfo> {
+            return fileEntryDao.getFolderBreakdown().map { row ->
+                FolderInfo(
+                    path = row.folderPath,
+                    name = row.folderName,
+                    fileCount = row.fileCount,
+                    totalSizeBytes = row.totalSizeBytes ?: 0L,
+                    lastModified = row.lastModified ?: 0L
+                )
+            }
+        }
     @ApplicationContext private val context: Context,
     private val fileEntryDao: FileEntryDao,
     private val excludedFolderDao: ExcludedFolderDao

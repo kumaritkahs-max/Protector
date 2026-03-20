@@ -60,11 +60,23 @@ class FolderBrowserViewModel @Inject constructor(
     val folders: StateFlow<List<FolderInfo>> = fileRepository.getFolders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Helper to get file count for a folder from the database
+    private suspend fun getFileCountForFolder(folderPath: String): Int {
+        // Use fileRepository.getAllFiles() and filter by folderPath
+        return fileRepository.getAllFiles(SortOrder(SortField.DATE_ADDED, false), FileFilter())
+            .first().count { it.folderPath == folderPath }
+    }
+
     init {
         viewModelScope.launch {
             folders.collect { folderList ->
                 if (_currentPath.value == null) {
-                    _items.value = folderList.map { BrowseItem.Folder(it) }
+                    // For each folder, fetch the file count from the database
+                    val folderItems = folderList.map { folder ->
+                        val count = getFileCountForFolder(folder.path)
+                        BrowseItem.Folder(folder.copy(fileCount = count))
+                    }
+                    _items.value = folderItems
                     _isLoading.value = false
                 }
             }
@@ -184,6 +196,10 @@ fun FolderBrowserScreen(
         viewModel.navigateUp()
     }
 
+    val listState = rememberLazyListState()
+    val totalItems = items.size
+    val firstVisible = listState.firstVisibleItemIndex + 1
+    val lastVisible = (listState.firstVisibleItemIndex + listState.layoutInfo.visibleItemsInfo.size).coerceAtMost(totalItems)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -235,13 +251,26 @@ fun FolderBrowserScreen(
                     }
                 }
                 else -> {
-                    LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
-                        items(items, key = {
+                    Column(Modifier.fillMaxSize()) {
+                        if (totalItems > 0) {
+                            Text(
+                                "Showing $firstVisible-$lastVisible of $totalItems",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.5f),
+                                modifier = Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
+                            )
+                        }
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            modifier = Modifier.weight(1f).simpleScrollbar(listState)
+                        ) {
+                        itemsIndexed(items, key = { index, it ->
                             when (it) {
-                                is BrowseItem.Folder -> "folder:${it.info.path}"
-                                is BrowseItem.FileItem -> "file:${it.entry.path}"
+                                is BrowseItem.Folder -> "folder:${it.info.path}#$index"
+                                is BrowseItem.FileItem -> "file:${it.entry.path}#$index"
                             }
-                        }) { item ->
+                        }) { _, item ->
                             when (item) {
                                 is BrowseItem.Folder -> {
                                     FolderItemRow(
@@ -256,6 +285,7 @@ fun FolderBrowserScreen(
                                     )
                                 }
                             }
+                        }
                         }
                     }
                 }

@@ -27,6 +27,25 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class ScanForegroundService : Service() {
+    private fun showScanResultNotification(fileCount: Int) {
+        val openIntent = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val text = "Scan complete: $fileCount files cataloged at " +
+            java.text.SimpleDateFormat("HH:mm, MMM d", java.util.Locale.getDefault()).format(java.util.Date())
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("FileVault Pro Scan Results")
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(openIntent)
+            .build()
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID + 1, notification)
+    }
 
     @Inject lateinit var fileRepository: FileRepository
     @Inject lateinit var appPreferences: AppPreferences
@@ -118,6 +137,7 @@ class ScanForegroundService : Service() {
                 appPreferences.setInitialScanDone(true)
 
                 updateNotification("Scan complete: $mediaCount files cataloged")
+                showScanResultNotification(mediaCount)
                 Log.d(TAG, "Foreground scan complete: $mediaCount files")
             } catch (e: Exception) {
                 Log.e(TAG, "Scan error: ${e.message}", e)

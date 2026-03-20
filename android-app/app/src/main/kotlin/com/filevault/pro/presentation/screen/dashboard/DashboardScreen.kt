@@ -308,6 +308,7 @@ private fun StatCard(
 @Composable
 private fun StorageCard(stats: CatalogStats) {
     var showBreakdown by remember { mutableStateOf(false) }
+    var showFolderDetails by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth().clickable { showBreakdown = true },
@@ -367,6 +368,10 @@ private fun StorageCard(stats: CatalogStats) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.3f))
                     }
                     Spacer(Modifier.height(8.dp))
+                    Button(onClick = { showFolderDetails = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Show Folder Details")
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -388,6 +393,48 @@ private fun StorageCard(stats: CatalogStats) {
                 TextButton(onClick = { showBreakdown = false }) { Text("Close") }
             }
         )
+    }
+
+    if (showFolderDetails) {
+        LaunchedEffect(showFolderDetails) {
+            if (showFolderDetails) viewModel.loadFolderBreakdown()
+        }
+        val folderBreakdown = viewModel.folderBreakdown.value
+        AlertDialog(
+            onDismissRequest = { showFolderDetails = false },
+            title = { Text("Folder Details", fontWeight = FontWeight.Bold) },
+            text = {
+                if (folderBreakdown.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                        folderBreakdown.forEach { folder ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Folder, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(folder.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(folder.path, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                }
+                                Text("${folder.fileCount} files", style = MaterialTheme.typography.bodySmall)
+                                Spacer(Modifier.width(8.dp))
+                                Text(FileUtils.formatSize(folder.totalSizeBytes), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.2f))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFolderDetails = false }) { Text("Close") }
+            }
+        )
+    }
     }
 }
 
