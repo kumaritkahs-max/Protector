@@ -23,15 +23,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-        private val _folderBreakdown = mutableStateOf<List<com.filevault.pro.domain.model.FolderInfo>>(emptyList())
-        val folderBreakdown: State<List<com.filevault.pro.domain.model.FolderInfo>> get() = _folderBreakdown
     @ApplicationContext private val context: Context,
     private val fileRepository: FileRepository,
     private val syncRepository: SyncRepository,
     private val appPreferences: AppPreferences
 ) : ViewModel() {
+
+    private val _folderBreakdown = mutableStateOf<List<com.filevault.pro.domain.model.FolderInfo>>(emptyList())
+    val folderBreakdown: State<List<com.filevault.pro.domain.model.FolderInfo>> get() = _folderBreakdown
 
     val stats: StateFlow<CatalogStats?> = fileRepository.getStats()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
