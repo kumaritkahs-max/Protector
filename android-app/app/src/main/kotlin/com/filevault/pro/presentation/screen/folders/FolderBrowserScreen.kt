@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,8 +24,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filevault.pro.domain.model.FileEntry
+import com.filevault.pro.domain.model.FileFilter
 import com.filevault.pro.domain.model.FileType
 import com.filevault.pro.domain.model.FolderInfo
+import com.filevault.pro.domain.model.SortField
+import com.filevault.pro.domain.model.SortOrder
 import com.filevault.pro.domain.repository.FileRepository
 import com.filevault.pro.util.FileUtils
 import com.filevault.pro.util.MediaQueue

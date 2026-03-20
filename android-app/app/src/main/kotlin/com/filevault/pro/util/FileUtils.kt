@@ -1,6 +1,7 @@
 package com.filevault.pro.util
 
 import android.content.Context
+import android.net.Uri
 import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Environment
@@ -118,6 +119,29 @@ object FileUtils {
      * (primary + secondary/SD card + OTG) so nothing is missed.
      * Always falls back to the primary external storage directory.
      */
+    fun getFileFromUri(context: Context, uri: Uri): File? {
+        return try {
+            when (uri.scheme) {
+                "file" -> uri.path?.let { File(it) }
+                "content" -> {
+                    val cursor = context.contentResolver.query(uri, null, null, null, null)
+                    val displayName = cursor?.use {
+                        if (it.moveToFirst()) it.getString(it.getColumnIndexOrThrow("_display_name")) else null
+                    }
+                    val fileName = displayName ?: "temp-${System.currentTimeMillis()}"
+                    val outFile = File(context.cacheDir, fileName)
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        outFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    outFile
+                }
+                else -> null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun getExternalStorageRoots(context: Context): List<File> {
         val roots = LinkedHashSet<File>()
 

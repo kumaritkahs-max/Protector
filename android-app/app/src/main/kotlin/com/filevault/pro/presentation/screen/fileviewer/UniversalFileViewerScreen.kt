@@ -223,7 +223,7 @@ fun UniversalFileViewerScreen(
                                 onResult = { uri ->
                                     showPicker = false
                                     if (uri != null) {
-                                        val destDir = com.filevault.pro.util.FileUtils.getFileFromUri(context, uri)
+                                        val destDir: File? = com.filevault.pro.util.FileUtils.getFileFromUri(context, uri)
                                         if (destDir != null) {
                                             val ok = com.filevault.pro.util.ZipUtils.unzip(file, destDir)
                                             unzipResult = if (ok) "Unzipped successfully to ${destDir.absolutePath}" else "Failed to unzip."
