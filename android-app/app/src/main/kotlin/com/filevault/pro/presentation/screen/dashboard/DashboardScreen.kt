@@ -63,7 +63,7 @@ fun DashboardScreen(
     val isScanning by viewModel.isScanning.collectAsState()
     val scanProgressCount by viewModel.scanProgressCount.collectAsState()
     val scanStage by viewModel.scanStage.collectAsState()
-    val folderBreakdown by viewModel.folderBreakdown
+    val folderBreakdown by viewModel.folderBreakdown.collectAsState(initial = emptyList())
 
     val context = LocalContext.current
     val hasMediaAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
