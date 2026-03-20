@@ -12,6 +12,14 @@ FileVault Pro is an Android file management and cataloging app paired with a pnp
 - **Real-time monitoring**: `MediaStoreObserver` (ContentObserver + FileObserver)
 - **UI**: Jetpack Compose + Material 3, Hilt DI, Room DB
 
+### Media Viewers & Players (new)
+- **ImageViewerScreen** — Pinch-to-zoom (up to 5x), pan, double-tap zoom, rotate 90°, fit-to-screen, share, file info panel
+- **AudioPlayerScreen** — Full player: seek bar, play/pause, skip ±10s, repeat/shuffle, playback speed (0.5x–2x), sleep timer; background playback via MediaPlaybackService (screen can be off)
+- **VideoPlayerScreen** — Seek bar, skip ±10s, playback speed, lock controls, fit/fill aspect ratio, volume slider; background playback via MediaPlaybackService
+- **UniversalFileViewerScreen** — Text/log/md with line numbers + search, JSON with syntax highlighting, binary files (PDF/Office/Archive/APK) show metadata + "Open With"; font size adjustable; word wrap toggle
+- **FolderBrowserScreen (updated)** — Now navigates inside folders showing files AND sub-folders; files display type badges, icons and size; tapping a file routes to the correct viewer automatically
+- **MediaPlaybackService** — Media3 `MediaSessionService` with `mediaPlayback` foreground service type, wake lock, audio focus management; keeps audio/video running with screen off
+
 ### Critical Android 15 (API 35) Compatibility Notes
 - `MANAGE_EXTERNAL_STORAGE` must be granted via Settings > Apps > All Files Access — the app checks `Environment.isExternalStorageManager()` at runtime in `performFileSystemWalk()` and will return 0 files with a log warning if not granted
 - `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO` are required for MediaStore queries on Android 13+

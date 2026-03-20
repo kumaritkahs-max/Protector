@@ -18,11 +18,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.filevault.pro.domain.model.FileType
+import com.filevault.pro.presentation.screen.audioplayer.AudioPlayerScreen
 import com.filevault.pro.presentation.screen.dashboard.DashboardScreen
 import com.filevault.pro.presentation.screen.detail.FileDetailScreen
 import com.filevault.pro.presentation.screen.duplicates.DuplicatesScreen
+import com.filevault.pro.presentation.screen.fileviewer.UniversalFileViewerScreen
 import com.filevault.pro.presentation.screen.files.FilesScreen
 import com.filevault.pro.presentation.screen.folders.FolderBrowserScreen
+import com.filevault.pro.presentation.screen.imageviewer.ImageViewerScreen
 import com.filevault.pro.presentation.screen.onboarding.OnboardingScreen
 import com.filevault.pro.presentation.screen.permission.PermissionScreen
 import com.filevault.pro.presentation.screen.photos.PhotosScreen
@@ -48,8 +52,17 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
     object FileDetail : Screen("file_detail/{path}", "Detail") {
         fun createRoute(path: String) = "file_detail/${URLEncoder.encode(path, "UTF-8")}"
     }
+    object ImageViewer : Screen("image_viewer/{path}", "Image Viewer") {
+        fun createRoute(path: String) = "image_viewer/${URLEncoder.encode(path, "UTF-8")}"
+    }
     object VideoPlayer : Screen("video_player/{path}", "Video Player") {
         fun createRoute(path: String) = "video_player/${URLEncoder.encode(path, "UTF-8")}"
+    }
+    object AudioPlayer : Screen("audio_player/{path}", "Audio Player") {
+        fun createRoute(path: String) = "audio_player/${URLEncoder.encode(path, "UTF-8")}"
+    }
+    object FileViewer : Screen("file_viewer/{path}", "File Viewer") {
+        fun createRoute(path: String) = "file_viewer/${URLEncoder.encode(path, "UTF-8")}"
     }
     object Folders : Screen("folders", "Folders")
     object Duplicates : Screen("duplicates", "Duplicates")
@@ -66,6 +79,22 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
 }
 
 val bottomNavItems = listOf(Screen.Dashboard, Screen.Photos, Screen.Videos, Screen.Files, Screen.Settings)
+
+fun openFileRoute(path: String, fileType: FileType): String {
+    return when (fileType) {
+        FileType.PHOTO -> Screen.ImageViewer.createRoute(path)
+        FileType.VIDEO -> Screen.VideoPlayer.createRoute(path)
+        FileType.AUDIO -> Screen.AudioPlayer.createRoute(path)
+        FileType.DOCUMENT, FileType.ARCHIVE, FileType.APK, FileType.OTHER ->
+            Screen.FileViewer.createRoute(path)
+    }
+}
+
+fun openFileRouteByPath(path: String): String {
+    val ext = path.substringAfterLast('.', "").lowercase()
+    val type = com.filevault.pro.domain.model.FileType.fromExtension(ext)
+    return openFileRoute(path, type)
+}
 
 @Composable
 fun AppNavGraph() {
@@ -130,17 +159,17 @@ fun AppNavGraph() {
             }
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
-                    onNavigateToPhotos  = { navController.navigate(Screen.Photos.route) },
-                    onNavigateToVideos  = { navController.navigate(Screen.Videos.route) },
-                    onNavigateToFiles   = { navController.navigate(Screen.Files.route) },
-                    onNavigateToSync    = { navController.navigate(Screen.SyncProfiles.route) },
-                    onNavigateToBrowse  = { navController.navigate(Screen.Folders.route) },
-                    onNavigateToDuplicates = { navController.navigate(Screen.Duplicates.route) }
+                    onNavigateToPhotos      = { navController.navigate(Screen.Photos.route) },
+                    onNavigateToVideos      = { navController.navigate(Screen.Videos.route) },
+                    onNavigateToFiles       = { navController.navigate(Screen.Files.route) },
+                    onNavigateToSync        = { navController.navigate(Screen.SyncProfiles.route) },
+                    onNavigateToBrowse      = { navController.navigate(Screen.Folders.route) },
+                    onNavigateToDuplicates  = { navController.navigate(Screen.Duplicates.route) }
                 )
             }
             composable(Screen.Photos.route) {
                 PhotosScreen(onFileClick = { path ->
-                    navController.navigate(Screen.FileDetail.createRoute(path))
+                    navController.navigate(Screen.ImageViewer.createRoute(path))
                 })
             }
             composable(Screen.Videos.route) {
@@ -150,7 +179,9 @@ fun AppNavGraph() {
             }
             composable(Screen.Files.route) {
                 FilesScreen(
-                    onFileClick = { path -> navController.navigate(Screen.FileDetail.createRoute(path)) },
+                    onFileClick = { path ->
+                        navController.navigate(openFileRouteByPath(path))
+                    },
                     onFolderBrowse = { navController.navigate(Screen.Folders.route) }
                 )
             }
@@ -163,12 +194,36 @@ fun AppNavGraph() {
                 FileDetailScreen(path = path, onBack = { navController.popBackStack() })
             }
             composable(
+                route = Screen.ImageViewer.route,
+                arguments = listOf(navArgument("path") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val encodedPath = backStackEntry.arguments?.getString("path") ?: ""
+                val path = java.net.URLDecoder.decode(encodedPath, "UTF-8")
+                ImageViewerScreen(path = path, onBack = { navController.popBackStack() })
+            }
+            composable(
                 route = Screen.VideoPlayer.route,
                 arguments = listOf(navArgument("path") { type = NavType.StringType })
             ) { backStackEntry ->
                 val encodedPath = backStackEntry.arguments?.getString("path") ?: ""
                 val path = java.net.URLDecoder.decode(encodedPath, "UTF-8")
                 VideoPlayerScreen(path = path, onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Screen.AudioPlayer.route,
+                arguments = listOf(navArgument("path") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val encodedPath = backStackEntry.arguments?.getString("path") ?: ""
+                val path = java.net.URLDecoder.decode(encodedPath, "UTF-8")
+                AudioPlayerScreen(path = path, onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Screen.FileViewer.route,
+                arguments = listOf(navArgument("path") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val encodedPath = backStackEntry.arguments?.getString("path") ?: ""
+                val path = java.net.URLDecoder.decode(encodedPath, "UTF-8")
+                UniversalFileViewerScreen(path = path, onBack = { navController.popBackStack() })
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(
@@ -182,7 +237,9 @@ fun AppNavGraph() {
             }
             composable(Screen.Folders.route) {
                 FolderBrowserScreen(
-                    onFileClick = { path -> navController.navigate(Screen.FileDetail.createRoute(path)) },
+                    onFileClick = { path ->
+                        navController.navigate(openFileRouteByPath(path))
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }
